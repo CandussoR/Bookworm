@@ -1,4 +1,7 @@
-# Metadata Transfer
+# My Library
 
 ## Aim
-This program's aim is to parse book metadata generated with Calibre to insert them in a database then move the files on my external drive.
+This app is a GUI rewrite of my old [metadata_transfer](https://github.com/CandussoR/metadata_transfer) repo.
+
+## Status
+Under Development.

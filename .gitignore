@@ -1,4 +1,10 @@
 config.py
-*.json
 .DS_Store
 __pycache__
+node_modules
+.vscode
+.env
+env.json
+*.sqlite
+*.txt
+api_doc.md
