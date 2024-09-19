@@ -33,11 +33,14 @@ import { onMounted } from 'vue';
 import axios from '../utils/apiRequester';
 import { useRouter } from 'vue-router';
 import EbookRow from '@/components/EbookRow.vue';
+import { ebookStore } from '@/stores/ebooks';
 
+const store = ebookStore()
 let ebooks = ref(null);
 let router = useRouter()
 
 onMounted(async () => {
+  ebooks.value = store.index()
   let res = await axios.get('ebooks')
   try {
     ebooks.value = res.data

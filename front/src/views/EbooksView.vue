@@ -3,7 +3,10 @@
 
         <h1 class="text-5xl text-center my-10">Your books</h1>
 
-        <SearchDetailCard :relation="route.params.key" :name="route.params.value" :related="related"/>
+        <div class="flex justify-center my-5">
+            <SearchDetailCard :relation="route.params.key" :name="route.params.value" :related="related"/>
+        </div>
+
         <!-- DaisyUI Component -->
         <div class="overflow-x-auto">
             <table class="table table-zebra">
@@ -37,13 +40,29 @@ import { useRoute } from 'vue-router';
 import EbookRow from '@/components/EbookRow.vue';
 import SearchDetailCard from '@/components/SearchDetailCard.vue';
 
-let ebooks = ref(null);
-let related = computed(() => 
-    ebooks.value 
-    ? ebooks.value.flatMap(e => e.theme).filter(t => t !== route.params.value)
-    : null
-)
+let ebooks = ref([]);
 const route = useRoute()
+let related = computed(() => {
+    if (ebooks.value.length === 0) return []
+
+    let related = []
+    let present_relations = new Map();
+    present_relations.set(route.params.value, 1)
+
+    for (let i = 0; i < ebooks.value.length; i++) {
+        const themes = ebooks.value[i].theme
+        if (themes.length === 0) continue;
+
+        for (let j = 0; j < themes.length ; j++) {
+            if (present_relations.has(themes[j])) continue;
+            else {
+                present_relations.set([themes[j]],1)
+                related.push(themes[j])
+            }
+        }
+    }
+    return related
+});
 
 onMounted(async() => {
     try {
