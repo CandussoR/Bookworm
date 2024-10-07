@@ -8,42 +8,76 @@
             <p class="text-center my-5" v-if="readingList.description">{{ readingList.description }}</p>
         </div>
 
-        <p class="text-center my-10">Books read : {{booksRead }} / {{ readingList.reading_list.length }}</p>
+        <p class="text-center my-10">Books read : {{booksRead }} / {{ readingList.items.length }}</p>
 
         <ul class="text-center max-w-xl">
-            <li v-for="(item,i) in readingList.reading_list" :key="item.ebook_guid">
+            <li v-for="(ebook,i) in readingList.items" :key="ebook.ebook_guid">
                 <div class="flex items-center">
                     <div class="mr-6">
                         <input name="read" type="checkbox" @click="toggleRead(i)">
                     </div>
                     <div class="mr-6">
-                        <p :class="item.read ? 'line-through text-gray-600' : ''"><b>{{ item.ebook_name }}</b></p>
-                        <p class="ml-10">{{item.comment}}</p>
+                        <p :class="ebook.read ? 'line-through text-gray-600' : ''"><b>{{ ebook.title }}</b></p>
+                        <p class="ml-10">{{ebook.comment}}</p>
                     </div>
                     <div>
-                        <img class="cursor-pointer" src="@/assets/delete.svg" alt="Delete" @click="deleteItem(i, item.ebook_guid)">
+                        <img class="cursor-pointer" src="@/assets/delete.svg" alt="Delete"
+                            @click="deleteItem(i, ebook.ebook_guid)">
                     </div>
                 </div>
             </li>
         </ul>
+
+        <button @click="addBookModal.showModal()">Add a book</button>
+        <dialog id="openAddBook" ref="addBookModal" class="modal" @keyup.esc="closeModal">
+            <div class="modal-box">
+                <h3 class="text-lg font-bold">Add a book</h3>
+                <p class="py-4">Press ESC key or click the button below to close</p>
+                <div class="modal-action">
+                    <form @submit.prevent="addBooksToModified" method="dialog">
+                        <label for="ebooks">ebook : </label>
+                        <input name="ebooks" type="text" list="ebookSearch" @input.stop="debounce">
+                        <!-- if there is a button in form, it will close the modal -->
+                        <button class="btn" type="submit">Add books</button>
+                        <div id="searchResults">
+                            <ul v-if="hasReceivedResponse && ebookSearchResult.length > 0">
+                                <li class="hover:cursor-pointer hover:bg-base-100 my-2 px-6 py-1"
+                                    v-for="ebook in ebookSearchResult" :key="ebook.ebook_guid"
+                                    @click="addItem(ebook.ebook_guid)">
+                                    {{ ebook.title }} ({{ ebook.author }})
+                                </li>
+                            </ul>
+                            <p v-else-if="hasReceivedResponse && ebookSearchResult.length == 0">
+                                No books related to your search.
+                            </p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </dialog>
     </div>
     <div v-else>
         <p>Loading...</p>
     </div>
+
 </template>
 
 <script setup>
 import { useReadingListStore } from '@/stores/readingLists';
-import { onMounted, ref, computed} from 'vue';
+import { onMounted, ref, computed, useTemplateRef} from 'vue';
 import { useRoute } from 'vue-router';
+import axios from '../utils/apiRequester';
 
 const route = useRoute()
 const store = useReadingListStore()
+const changes = ref([])
+const hasReceivedResponse = ref(0)
 const readingList = ref(null)
 const readingListIndex = ref(null)
-const booksRead = computed(() => readingList.value.reading_list.map(item => item.read).reduce((acc,curr) => acc+curr, 0))
-const dirty = ref(0)
-const modified = ref({})
+const booksRead = computed(() => readingList.value.items.map(item => item.read).reduce((acc,curr) => acc+curr, 0))
+const addBookModal = useTemplateRef('addBookModal');
+const ebookSearchResult = ref([])
+const timer = ref()
 
 onMounted(async () => {
     if (!store.readingLists) {
@@ -58,103 +92,117 @@ onMounted(async () => {
     }
 })
 
+
 function toggleRead(i) {
     if (readingList.value.reading_list[i].read === 1) {
         readingList.value.reading_list[i].read = 0
     } else {
         readingList.value.reading_list[i].read = 1
     }
-    dirty.value = 1
     updateModify("read", readingList.value.reading_list[i].read, i, "update")
-    
 }
 
 function deleteItem(index) {
     updateModify(null, null, index, "delete")
 }
 
-function updateModify(key=null, value=null, index=null, action=null) {
+function addItem(ebook_guid) {
+    updateModify("ebook_guid", ebook_guid, null, "add")
+}
+
+/**
+ * Procedure to determine how to bookkeep changes to a reading list.
+ * @param {string} key - A key of a readingList object or of a list item
+ * @param {string} value - The new value of specified key
+ * @param {integer} index - Index of the modified item (works only with update and delete as actions)
+ * @param {string} action - The type of action to execute on the reading list (add, update, delete)
+ */
+async function updateModify(key=null, value=null, index=null, action=null) {
     if (index && (!action || !["update", "delete"].includes(action))) {
         throw new Error("If there's an index, there's an action.")
+    } else if (index == null && action && action !== "add") {
+        throw new Error("If you add, you don't get to choose your index.")
     }
 
-    if (isOriginalValue(key, value, index, action)) {
-        deleteFromModified(key, value, index, action)
-        return;
-    } else if (hasBeenModified(key, value, index, action)) {
-        deleteFromModified(key, value, index, action);
-    }
-
-    if (index === null && value && key) {
-        modified.value[key] = value;
-        return;
-    }
-
-    if (!("items" in modified.value)) {
-        modified.value.items = []
-    }
-
-    if (action === "update") {
-        modified.value.items.push({ "i": index, "action": action, [key]: value });
-        return;
-    } else if (action === "delete") {
-        modified.value.items.push({ "i": index, "action": "delete" })
-        readingList.value.reading_list.splice(index, 1);
-        return;
-    }
-}
-
-function isOriginalValue(key, value, index=null, action=null) {
-    if (action == "delete") {
-        return false;
-    }
-
-    const storeReadingList = store.readingLists[readingListIndex.value]
-    if (index !== null && action) {
-        return storeReadingList.reading_list[index][key] === value;
-    }
-
-    if (storeReadingList[key] === value) return true;
-    else return false;
-}
-
-function hasBeenModified(key, value, index=null, action=null) {
-    // Not checking for delete for now since you can't update something you actually deleted
-    if (index !== null && action) {
-        if (!(modified.value.items) || !modified.value.items.length) return false;
-
-        for (let i =0; i < modified.value.items.length; i++) {
-            if (modified.value.items[i]["i"] === index && [key] in modified.value.items[i]) return true;
+    let newValue = null
+    const theKey = key === "name" || key === "description" ? key : "items"
+    if (theKey === "items") {
+        if (action === "add") {
+            newValue = {"action" : action, "key" : key, "val" : value}
+        } else if (action === "delete") {
+            newValue = {"action" : action, "i": index}
+        } else if (action === "update") {
+            newValue = {"action" : action, "i" : index, "key" : key, "val" : value}
         }
-    } 
-    if ([key] in modified.value) {
-        return true;
+        else {
+            throw new Error("Wrong action man")
+        }
     }
-    return false
-}
 
+    const data = {"reading_list_guid" : readingList.value.reading_list_guid,
+                  [theKey] : newValue
+    }
 
-function deleteFromModified(key, value, index=null, action=null) {
-    // If we're here, either we returned to an original value or we found that value has been modified before and we're cleaning
-    if (index !== null && action == "update") {
+    try {
+        const res = await axios.put('reading_lists', data)
+        if (res.status !== 200) {
+            throw new Error(res.status, res.statusText)
+        }
 
-        for (let i=0; i < modified.value.items.length; i++) {
-            if (modified.value.items[i]["i"] === index && key in modified.value.items[i]) {
-                modified.value.items.splice(i,1);
-                return;
+        const response_data = JSON.parse(res.data);
+
+        if (theKey !== "items") {
+            changes.value.push({ [theKey]: readingList.value[theKey] })
+        } else {
+            if (action === "add") {
+                changes.value.push({ "action": "delete", index: -1 })
+            } else if (action === "update") {
+                changes.value.push({ "action": action, [key]: readingList.value.items[index][key] })
+            } else {
+                changes.value.push({ "action": "add", [key]: value })
             }
         }
 
-    } else if (index !== null && action == "delete") {
+        // Updating value of current reading list to the returned value if the request was successfull
+        for (let i = 0; i < store.readingLists.length; i++) {
+            if (!(store.readingLists[i].reading_list_guid === route.params.guid)) continue;
+            store.readingLists[i] = response_data
+            break;
+        }
 
-        modified.value.items = modified.value.items.filter(el => el.i === index)
-
-    } else {
-
-        delete modified.value.key
-
+        readingList.value = response_data;
+    }
+    catch (error) {
+        console.error(error);
     }
 }
+
+
+function debounce(event) {
+    // On each input, we delete the timer set to only send a request with the latest input
+    if (timer.value) {
+        clearTimeout(timer.value)
+    }
+    // We also want to reset the received_response since we have not yet make the request
+    hasReceivedResponse.value = 0
+
+    if (event.target.value == '') {
+        ebookSearchResult.value = []
+        return;
+    }
+    // searchForBooks only gets called when user stops typing for 500ms
+    timer.value = setTimeout(() => searchForBooks(event.target.value), 500)
+}
+
+
+async function searchForBooks(search) {
+    const res = await axios.get(`ebooks?search=${search}`)
+    hasReceivedResponse.value = 1
+    if (res.data) {
+        ebookSearchResult.value = res.data
+    }
+}
+
 </script>
 
 <style scoped></style>
