@@ -74,8 +74,8 @@ CREATE TABLE IF NOT EXISTS ebooks_themes(
      FOREIGN KEY (theme_id) REFERENCES themes (theme_id)
 );
 CREATE TABLE IF NOT EXISTS reading_status (
-     status_id INTEGER PRIMARY KEY,
-     reading_status UNIQUE TEXT NOT NULL
+     reading_status_id INTEGER PRIMARY KEY,
+     reading_status TEXT UNIQUE NOT NULL
      );
 CREATE TABLE IF NOT EXISTS readings (
      reading_id INTEGER PRIMARY KEY,
@@ -83,15 +83,17 @@ CREATE TABLE IF NOT EXISTS readings (
      beginning_date TEXT NOT NULL,
      ending_date TEXT,
      reading_status_id INTEGER NOT NULL,
-     reading_guid UNIQUE TEXT NOT NULL,
+     reading_guid TEXT UNIQUE NOT NULL,
      FOREIGN KEY (ebook_id) REFERENCES ebooks (ebook_id),
      FOREIGN KEY (reading_status_id) REFERENCES reading_status (reading_status_id)
 );
 CREATE TABLE IF NOT EXISTS reading_lists(
      reading_list_id INTEGER PRIMARY KEY,
-     name UNIQUE TEXT NOT NULL,
+     name  TEXT UNIQUE NOT NULL,
+     description TEXT,
      items TEXT NOT NULL,
-     reading_list_guid UNIQUE TEXT NOT NULL
+     reading_list_guid  TEXT UNIQUE NOT NULL
+);
 '''
 
 
