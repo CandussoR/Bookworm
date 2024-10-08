@@ -13,8 +13,8 @@
         <ul class="text-center max-w-xl">
             <li v-for="(ebook,i) in readingList.items" :key="ebook.ebook_guid">
                 <div class="flex items-center">
-                    <div class="mr-6">
-                        <input name="read" type="checkbox" @click="toggleRead(i)" :checked="ebook.read">
+                    <div class="mr-6 cursor-pointer" @click="toggleRead(i)">
+                        <ReadSvg read="ebook.read"/>
                     </div>
                     <div class="mr-6">
                         <p :class="ebook.read ? 'line-through text-gray-600' : ''"><b>{{ ebook.title }}</b></p>
@@ -67,6 +67,7 @@ import { useReadingListStore } from '@/stores/readingLists';
 import { onMounted, ref, computed, useTemplateRef} from 'vue';
 import { useRoute } from 'vue-router';
 import axios from '../utils/apiRequester';
+import ReadSvg from '@/components/readSvg.vue';
 
 const route = useRoute()
 const store = useReadingListStore()
