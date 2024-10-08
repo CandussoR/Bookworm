@@ -40,6 +40,12 @@ class ReadingListRessource():
     reading_list_guid : str
     description : str | None = None
 
+    def __post_init__(self):
+        self.items = json.loads(self.items)
+
+    def __str__(self):
+        return json.dumps(self.__dict__)
+
 
 class ReadingListService():
     def __init__(self, conn):
@@ -64,7 +70,7 @@ class ReadingListService():
             # If action is neither delete or add, it's an update
             self.repo.update(req)
             name, description, items, reading_list_guid = self.repo.get(req["reading_list_guid"])
-            return ReadingListRessource(name, items, reading_list_guid, description).__dict__
+            return ReadingListRessource(name, items, reading_list_guid, description)
         except (TypeError, sqlite3.ProgrammingError) as e:
             import traceback
             print(traceback.print_exc())
@@ -88,7 +94,6 @@ class ReadingListController(LibraryController):
                         reading_list_guid=reading_list_guid,
                     )
                 )
-            print("ressource\n", ressource)
             return 200, json.dumps({"reading_lists" : [asdict(r) for r in ressource]})
         else : 
             return 200, ReadingListRepository(self.conn).get(self.data)

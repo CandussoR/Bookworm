@@ -11,7 +11,9 @@ class ReadingListRepository():
 
     def get(self, reading_list_guid):
         return self.conn.execute(
-            """SELECT name, description, items, reading_list_guid FROM reading_lists WHERE reading_list_guid = ?;""",
+            """SELECT name, description, items, reading_list_guid 
+               FROM reading_lists 
+               WHERE reading_list_guid = ?;""",
             [reading_list_guid],
         ).fetchone()
 
@@ -35,11 +37,11 @@ class ReadingListRepository():
             match(req["items"]["action"]):
                 case "delete":
                     self.conn.execute(
-                        '''UPDATE reading_lists
+                        """UPDATE reading_lists
                         SET items = json_remove(items, ?)
-                        WHERE reading_list_guid = ?;''',
-                        (f'$[{req["items"]["i"]}]',  req["reading_list_guid"])
-                        )
+                        WHERE reading_list_guid = ?;""",
+                        (f'$[{req["items"]["i"]}]', req["reading_list_guid"]),
+                    )
                 case "add":
                     self.conn.execute(
                         '''UPDATE reading_lists 
@@ -48,11 +50,15 @@ class ReadingListRepository():
                         (req["items"]["content"],  req["reading_list_guid"])
                     )
                 case "update":
-                    self.conn.execute('''UPDATE reading_lists 
+                    self.conn.execute(
+                        """UPDATE reading_lists 
                         SET items = json_set(items, ?, json(?)) 
-                        WHERE reading_list_guid = ?;''',
-                        (f'$[{req["items"]["i"]}].{req["key"]}', req["val"], 
-                        req["reading_list_guid"])
+                        WHERE reading_list_guid = ?;""",
+                        (
+                            f'$[{req["items"]["i"]}].{req["items"]["key"]}',
+                            req["items"]["val"],
+                            req["reading_list_guid"],
+                        ),
                     )
 
         elif "name" in req:
@@ -69,7 +75,6 @@ class ReadingListRepository():
                 WHERE reading_list_guid = (:reading_list_guid);''',
                 req.__dict__,
             )
-
 
     def delete(self, reading_list_guid):
         self.conn.execute(

@@ -14,7 +14,7 @@
             <li v-for="(ebook,i) in readingList.items" :key="ebook.ebook_guid">
                 <div class="flex items-center">
                     <div class="mr-6">
-                        <input name="read" type="checkbox" @click="toggleRead(i)">
+                        <input name="read" type="checkbox" @click="toggleRead(i)" :checked="ebook.read">
                     </div>
                     <div class="mr-6">
                         <p :class="ebook.read ? 'line-through text-gray-600' : ''"><b>{{ ebook.title }}</b></p>
@@ -79,6 +79,7 @@ const addBookModal = useTemplateRef('addBookModal');
 const ebookSearchResult = ref([])
 const timer = ref()
 
+
 onMounted(async () => {
     if (!store.readingLists) {
         await store.index();
@@ -94,12 +95,12 @@ onMounted(async () => {
 
 
 function toggleRead(i) {
-    if (readingList.value.reading_list[i].read === 1) {
-        readingList.value.reading_list[i].read = 0
+    if (readingList.value.items[i].read === 1) {
+        readingList.value.items[i].read = 0
     } else {
-        readingList.value.reading_list[i].read = 1
+        readingList.value.items[i].read = 1
     }
-    updateModify("read", readingList.value.reading_list[i].read, i, "update")
+    updateModify("read", readingList.value.items[i].read, i, "update")
 }
 
 function deleteItem(index) {
@@ -149,8 +150,6 @@ async function updateModify(key=null, value=null, index=null, action=null) {
             throw new Error(res.status, res.statusText)
         }
 
-        const response_data = JSON.parse(res.data);
-
         if (theKey !== "items") {
             changes.value.push({ [theKey]: readingList.value[theKey] })
         } else {
@@ -166,11 +165,11 @@ async function updateModify(key=null, value=null, index=null, action=null) {
         // Updating value of current reading list to the returned value if the request was successfull
         for (let i = 0; i < store.readingLists.length; i++) {
             if (!(store.readingLists[i].reading_list_guid === route.params.guid)) continue;
-            store.readingLists[i] = response_data
+            store.readingLists[i] = res.data
             break;
         }
 
-        readingList.value = response_data;
+        readingList.value = res.data;
     }
     catch (error) {
         console.error(error);
