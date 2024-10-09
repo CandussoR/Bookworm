@@ -52,7 +52,7 @@ class ReadingListRepository():
                 case "update":
                     self.conn.execute(
                         """UPDATE reading_lists 
-                        SET items = json_set(items, ?, json(?)) 
+                        SET items = json_set(items, ?, ?) 
                         WHERE reading_list_guid = ?;""",
                         (
                             f'$[{req["items"]["i"]}].{req["items"]["key"]}',
@@ -66,14 +66,14 @@ class ReadingListRepository():
                 '''UPDATE reading_lists
                 SET name = COALESCE(:name, name)
                 WHERE reading_list_guid = (:reading_list_guid);''',
-                req.__dict__,
+                req
             )
         elif "description" in req:
             self.conn.execute(
                 '''UPDATE reading_lists 
                 SET description = COALESCE(:description, description)
                 WHERE reading_list_guid = (:reading_list_guid);''',
-                req.__dict__,
+                req
             )
 
     def delete(self, reading_list_guid):
