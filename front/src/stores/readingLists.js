@@ -8,8 +8,10 @@ export const useReadingListStore = defineStore('readingLists', () => {
     async function index() {
         try {
             const res = await axios.get('reading_lists')
+            
             if (res.data) {
-                readingLists.value = res.data
+                readingLists.value = res.data.reading_lists;
+                console.log("I'm the store and I set readingLists to this", readingLists.value)
             }
         }
         catch (error) {
