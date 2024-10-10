@@ -114,8 +114,6 @@ const timer = ref()
 const newDescription = ref('')
 const editDescription = ref(false)
 
-watch(editDescription, (ov) => console.log(ov))
-
 onMounted(async () => {
     if (!store.readingLists) {
         await store.index();
@@ -131,7 +129,6 @@ onMounted(async () => {
             newDescription.value = readingList.value.description;
         }
     }
-    console.log(newDescription.value)
 })
 
 
