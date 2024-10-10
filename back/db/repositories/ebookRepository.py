@@ -30,13 +30,30 @@ class EbookRepository():
                     GROUP BY ebook_id
                 )
                 SELECT e.title, author, e.year_of_publication, p.publisher, genre, theme, e.ebook_guid
-                FROM ea
-                JOIN ebooks e ON ea.ebook_id = e.ebook_id
+                FROM ebooks e
+                JOIN ea ON ea.ebook_id = e.ebook_id
                 JOIN publishers p ON p.publisher_id = e.publisher_id
-                JOIN et ON ea.ebook_id = et.ebook_id
-                JOIN eg ON ea.ebook_id = eg.ebook_id;
+                LEFT JOIN et ON ea.ebook_id = et.ebook_id
+                LEFT JOIN eg ON ea.ebook_id = eg.ebook_id;
               '''
         return self.conn.execute(sb).fetchall()
+
+
+    def get_ebook_for_reading_list(self, ebook_id) -> tuple:
+        '''We generally have to retrieve the id before making any change in the database so using the id is quite convenient.
+           Returns (title, author, year_of_publication, publisher, genre, theme, ebook_guid).
+        '''
+        sb = f'''WITH ea AS (
+            SELECT ea.ebook_id, GROUP_CONCAT(a.full_name, ',') as author
+            FROM ebooks_authors ea
+            JOIN authors a ON ea.author_id = a.author_id
+            WHERE ebook_id = {ebook_id}
+        )
+        SELECT e.title, author, e.ebook_guid
+        FROM ea
+        JOIN ebooks e ON ea.ebook_id = e.ebook_id;
+        '''
+        return self.conn.execute(sb).fetchone()
 
 
     def get_ebook(self, ebook_id) -> tuple:
@@ -44,7 +61,7 @@ class EbookRepository():
            Returns (title, author, year_of_publication, publisher, genre, theme, ebook_guid).
         '''
         sb = f'''WITH et AS (
-            SELECT et.ebook_id, GROUP_CONCAT(t.theme, ',' ) as theme
+
             FROM ebooks_themes et
             JOIN themes t ON t.theme_id = et.theme_id
             WHERE ebook_id = {ebook_id}
@@ -55,18 +72,9 @@ class EbookRepository():
             JOIN authors a ON ea.author_id = a.author_id
             WHERE ebook_id = {ebook_id}
         ),
-        eg AS (
-            SELECT eg.ebook_id, GROUP_CONCAT(g.genre, ',') as genre
-            FROM ebooks_genres eg
-            JOIN genres g ON g.genre_id = eg.genre_id
-            WHERE ebook_id = {ebook_id}
-        )
-        SELECT e.title, author, e.year_of_publication, p.publisher, genre, theme, e.ebook_guid
+        SELECT e.title, author, e.ebook_guid
         FROM ea
         JOIN ebooks e ON ea.ebook_id = e.ebook_id
-        JOIN publishers p ON p.publisher_id = e.publisher_id
-        JOIN et ON ea.ebook_id = et.ebook_id
-        JOIN eg ON ea.ebook_id = eg.ebook_id;
         '''
         return self.conn.execute(sb).fetchone()
 
@@ -344,3 +352,19 @@ class EbookRepository():
                     JOIN ebooks_with_genres eg ON ei.ebook_id = eg.ebook_id
                     JOIN ebooks_with_themes et ON ei.ebook_id = et.ebook_id;'''
         return self.conn.execute(query, [name])
+    
+
+    def search(self, query):
+        param = f'%{query}%'
+        data = self.conn.execute(f'''
+                          WITH matches as (
+                            SELECT ebook_id, title, ebook_guid
+                            FROM ebooks
+                            WHERE title LIKE \'{param}\'
+                          )
+                          SELECT m.title, GROUP_CONCAT(a.full_name, ',') as author, m.ebook_guid
+                          FROM matches m
+                          JOIN ebooks_authors ea ON ea.ebook_id = m.ebook_id
+                          JOIN authors a ON a.author_id = ea.author_id;''').fetchall()
+        print(data, data == [(None, None, None)])
+        return data if data != [(None, None, None)] else data

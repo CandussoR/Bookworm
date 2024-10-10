@@ -17,11 +17,7 @@
             <th>Theme</th>
           </tr>
         </thead>
-        <tbody>
-          <tr v-for="(e, i) in ebooks" :key="e.ebook_guid" >
-            <EbookRow :ebook="e" :i="i" @get-ebooks-for="(key, value) => seeBooksFor(key, value)"></EbookRow>
-          </tr>
-        </tbody>
+        <TableBody :ebooks="ebooks" @get-ebooks-for="(key, value) => seeBooksFor(key, value)"/>
       </table>
     </div>
   </main>
@@ -30,32 +26,24 @@
 <script setup>
 import { ref } from 'vue';
 import { onMounted } from 'vue';
-import axios from '../utils/apiRequester';
 import { useRouter } from 'vue-router';
-import EbookRow from '@/components/EbookRow.vue';
-import { ebookStore } from '@/stores/ebooks';
+import TableBody from '@/components/TableBody.vue';
+import { ebookStore } from '@/stores/ebooks.js';
 
 const store = ebookStore()
 let ebooks = ref(null);
 let router = useRouter()
 
 onMounted(async () => {
-  ebooks.value = store.index()
-  let res = await axios.get('ebooks')
-  try {
-    ebooks.value = res.data
+  if (!store.ebooks) {
+    await store.index()
   }
-  catch (error) {
-    console.log(error)
-  }
+  ebooks.value = store.ebooks
+  console.log("Im homeview and ebooks are now", ebooks.value)
 })
 
 function seeBooksFor(key, value) {
-  console.log(key, value)
   // Router sur une autre page qui affiche les ebooks liés à la clé sélectionnée.
-  let d = {}
-  d[key] = value
-  console.log(d)
   router.push({ name : `ebooks`, params: {"key" : key, "value" : value} })
 }
 </script>

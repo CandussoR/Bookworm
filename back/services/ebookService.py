@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from functools import lru_cache
 import sqlite3
 from uuid import UUID, uuid4
 import json
@@ -60,10 +61,23 @@ class EbookResource():
     def __post_init__(self):
         for k,v in self.__dict__.items():
             if k in ["author", "genre", "theme"]:
-                setattr(self, k, v.split(','))
+                if v is not None:
+                    setattr(self, k, v.split(','))
+                else:
+                    setattr(self, k, None)
         if not self.country:
             delattr(self, "country")
         
+
+    def __repr__(self):
+        return json.dumps(self.__dict__)
+
+
+@dataclass
+class EbookSearchResult:
+    title : str
+    author : str
+    ebook_guid : str
 
     def __repr__(self):
         return json.dumps(self.__dict__)
@@ -76,16 +90,22 @@ class EbookService():
         self.conn = conn
         self.repository = EbookRepository(conn)
 
+    @lru_cache(maxsize = 1)
     def index(self) -> list[EbookResource]:
         data = self.repository.get_ebooks()
-        ebooks = [EbookResource(*d) for d in data]
-        return ebooks
+        return [EbookResource(*d) for d in data] if data else []
 
 
     def get_by(self, key, value) -> list[EbookResource]:
         data = self.repository.get_ebooks_by(key, value)
-        return [EbookResource(*d) for d in data]
+        return [EbookResource(*d) for d in data] if data else []
 
+
+    def search(self, query):
+        data = self.repository.search(query)
+        print(data)
+        return [EbookSearchResult(*d) for d in data] if data else []
+    
 
     def create(self, request : EbookRequest) -> EbookResource:
         author_repo = AuthorRepository(self.conn)
@@ -202,13 +222,17 @@ class EbookController(LibraryController):
 
 
     def do_GET(self):
+        '''Gets either no data or an array of key, value'''
         try :
             if not self.data:
                 return 200, self.service.index()
+            elif self.data and self.data[0] == 'search':
+                return 200, self.service.search(self.data[1]) 
             else :
                 return 200, self.service.get_by(*self.data)
         except sqlite3.OperationalError as e:
             return 500, f"An error occurred. ${str(e)}"
+
 
 
     def do_POST(self):
