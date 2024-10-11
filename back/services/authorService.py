@@ -66,7 +66,7 @@ class AuthorService():
         model = AuthorModel(request.full_name, request.birth_year, request.death_year, gender_id, country_id, request.author_guid)
         self.repository.create(model)
         if return_author :
-            author = self.repository.get_author(request.guid)
+            author = self.repository.get(request.guid)
             return AuthorResource(*author)
 
 

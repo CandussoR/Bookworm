@@ -61,7 +61,6 @@ class EbookRepository():
            Returns (title, author, year_of_publication, publisher, genre, theme, ebook_guid).
         '''
         sb = f'''WITH et AS (
-
             FROM ebooks_themes et
             JOIN themes t ON t.theme_id = et.theme_id
             WHERE ebook_id = {ebook_id}
@@ -366,5 +365,5 @@ class EbookRepository():
                           FROM matches m
                           JOIN ebooks_authors ea ON ea.ebook_id = m.ebook_id
                           JOIN authors a ON a.author_id = ea.author_id;''').fetchall()
-        print(data, data == [(None, None, None)])
-        return data if data != [(None, None, None)] else data
+        print(data, type(data), data == [(None, None, None)])
+        return data if data != [(None, None, None)] else None

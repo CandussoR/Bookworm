@@ -7,22 +7,24 @@ class PublisherRepository():
         return self.conn.execute('SELECT publisher, publisher_guid FROM publishers;').fetchall()
 
 
-    def get(self, guid):
-        return self.conn.execute('SELECT publisher, publisher_guid FROM publishers WHERE publisher_guid = ?;', [guid]).fetchone()
+    def get(self, guid : str | None = None, id : str | None = None):
+        if guid and id:
+            raise ValueError("It's either guid or id, not both.")
+        if guid:
+            return self.conn.execute('SELECT publisher, publisher_guid FROM publishers WHERE publisher_guid = ?;', [guid]).fetchone()
+        elif id:
+            return self.conn.execute('SELECT publisher, _publisher_guid FROM publishers WHERE publisher_id = ?;', [id]).fetchone()
 
 
     def get_id(self, name) -> int:
-        id, = self.conn.execute('SELECT publisher_id FROM publishers WHERE publisher = (?);', [name]).fetchone()
-        if not id:
-            raise Exception("Publisher hasn't been created yet.")
-        return id
+        return self.conn.execute('SELECT publisher_id FROM publishers WHERE publisher = (?);', [name]).fetchone()
 
 
     def create(self, model):
         '''Takes a model and returns a tuple for the PublisherResource.'''
         return self.conn.execute(
             """INSERT INTO publishers (publisher, publisher_guid) VALUES (:publisher, :publisher_guid)
-            RETURNING publisher, publisher_guid;""",
+            RETURNING publisher_id;""",
             model.__dict__,
         ).fetchone()
 

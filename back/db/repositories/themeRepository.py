@@ -8,11 +8,12 @@ class ThemeRepository():
         return self.conn.execute('SELECT theme, theme_guid FROM themes;').fetchall()
     
 
+    def get(self, id):
+        return self.conn.execute('SELECT theme, theme_guid FROM themes WHERE theme = ?', (id,)).fetchone()
+    
+
     def get_id(self, theme):
-        id, = self.conn.execute('''SELECT theme_id FROM themes WHERE theme = (?)''', [theme]).fetchone()
-        if not id:
-            raise Exception("Theme doesn't exist yet.")
-        return id
+        return self.conn.execute('''SELECT theme_id FROM themes WHERE theme = (?)''', [theme]).fetchone()
     
 
     def get_id_from_guid(self, guid) -> int:
@@ -23,7 +24,7 @@ class ThemeRepository():
     
     
     def create(self, model):
-        return self.conn.execute('''INSERT INTO themes (theme, theme_guid) VALUES :theme, :theme_guid RETURNING theme, theme_guid RETURNING theme_id;''', [model.__dict__]).fetchone()
+        return self.conn.execute('''INSERT INTO themes (theme, theme_guid) VALUES :theme, :theme_guid RETURNING theme_id;''', [model.__dict__]).fetchone()
     
     
     def update(self, model):

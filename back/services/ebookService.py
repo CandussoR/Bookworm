@@ -43,8 +43,9 @@ class EbookModel():
     publisher_id : int 
     year_of_publication : int
     ebook_guid : str
-
-
+    
+    def new_guid(self):
+        self.ebook_guid = str(uuid4())
 
 
 @dataclass
@@ -103,7 +104,6 @@ class EbookService():
 
     def search(self, query):
         data = self.repository.search(query)
-        print(data)
         return [EbookSearchResult(*d) for d in data] if data else []
     
 
@@ -116,7 +116,8 @@ class EbookService():
         authors_id = []
         genres_id = []
         themes_id = []
-        for k,v in request.__dict__.items():                
+        for k,v in request.__dict__.items(): 
+            v = [v] if not isinstance(v, list) else v          
             match k:
                 case "author":
                     authors_id = self._get_ids(k, author_repo, v)
@@ -124,9 +125,11 @@ class EbookService():
                     genres_id = self._get_ids(k, genre_repo, v)
                 case "theme":
                     themes_id = self._get_ids(k, theme_repo, v)
-        publisher = PublisherRepository(self.conn).get_id(request.publisher)
-        model = EbookModel(request.title, publisher, request.year_of_publication, str(request.ebook_guid))
-        ebook_id = self.repository.create(model)
+                case "publisher":
+                    # There's only one publisher every time for now
+                    [publisher_id] = self._get_ids(k, PublisherRepository(self.conn), v)
+        model = EbookModel(request.title, publisher_id, request.year_of_publication, str(request.ebook_guid))
+        ebook_id = self._create_ebook(model)
 
         cross_tables_repo.create("ebooks_authors", [(ebook_id, a) for a in authors_id])
         cross_tables_repo.create("ebooks_themes", [(ebook_id, t) for t in themes_id])
@@ -137,7 +140,8 @@ class EbookService():
     
 
     def update(self, request):
-        '''Handle an update request which might be only minimal with Model fields, or greater if other fields are modified.'''
+        '''Handle an update request which might be only minimal with Model fields,
+        or greater if other fields are modified.'''
         ebook_id = self.repository.get_id_from_guid(request.ebook_guid)
 
         for v in ["author", "theme", "genre"]:
@@ -145,6 +149,7 @@ class EbookService():
                 repo = self._create_repo(v)
                 ids= [repo.get_id_from_guid(v) for v in request[v]]
                 self._update_cross_table(f"ebooks_{v}s", ebook_id, ids)
+        
         model = EbookModel(request.title, request.publisher_id, request.year_of_publication, request.ebook_guid)
         self.repository.update(model)
         data = self.repository.get_ebook(ebook_id)
@@ -171,18 +176,30 @@ class EbookService():
             raise KeyError("This key isn't possible")
         
 
-    def _get_ids(self, key, repo, values):
+    def _get_ids(self, key, repo, values : list[str]):
             ids = []
             for v in values:
-                try:
-                    ids.append(repo.get_id(v))
-                except Exception:
-                    id, = repo.create(self.create_model(key, v))
-                    ids.append(id)
+                id = repo.get_id(v)
+                if not id:
+                    id, = repo.create(self._create_model(key,v))
+                else:
+                    # Unpacking the tuple only now since unpacking None raises a TypeError
+                    id = id,
+                ids.append(id)
             return ids
     
+    def _create_ebook(self, model : EbookModel) -> int:
+        while True:
+            try:
+                ebook_id = self.repository.create(model)
+                break
+            # If guid is not unique per curse
+            except sqlite3.IntegrityError:
+                model.new_guid()
+        return ebook_id
+    
 
-    def create_model(self, key, v):
+    def _create_model(self, key, v):
         if key == "author":
             return AuthorModel(full_name=v)
         elif key == "genre":

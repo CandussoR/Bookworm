@@ -8,17 +8,14 @@ class AuthorRepository():
         return self.db.execute(q).fetchall()
 
 
-    def get_author(self, guid):
+    def get(self, guid):
         q = 'SELECT full_name, birth_year, death_year, c.country, author_guid FROM authors JOIN countries ON c.country_id = authors.country_id WHERE author_guid = ?;'
-        return self.db.execute(q, [guid]).fetchall()
+        return self.db.execute(q, [guid]).fetchone()
     
 
     def get_id(self, name):
         '''Raise an exception if the name can't be found.'''
-        id, = self.db.execute('''SELECT author_id FROM authors WHERE full_name = (?)''', [name]).fetchone()
-        if not id:
-            raise Exception("Author doesn't exist yet")
-        return id
+        return self.db.execute('''SELECT author_id FROM authors WHERE full_name = (?)''', [name]).fetchone()
     
 
     def get_id_from_guid(self, guid) -> int:
@@ -50,7 +47,7 @@ class AuthorRepository():
             ret = 'RETURNING author_id'
         q = f'''INSERT INTO authors (full_name, birth_year, death_year, gender_id, country_id, author_guid)
                VALUES (:full_name, :birth_year, :death_year, :gender_id, :country_id, :author_guid) {ret};''',
-        self.db.execute(q, [model.__dict__])
+        return self.db.execute(q, [model.__dict__])
 
 
     def update(self, model):
