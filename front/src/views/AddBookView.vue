@@ -1,6 +1,5 @@
 <template>
     <main class="flex flex-col align-center">
-    <!-- <div class="flex flex-col h-screen flew-grow justify-center items-center overflow-scroll"> -->
         <h3 class="text-lg font-bold text-center">New Book</h3>
 
         <div class="flex w-full" v-if="!choice">
@@ -18,16 +17,14 @@
         <div class="flex w-full" v-else>
             
                 <div id="drag-drop-block" v-if="choice == 'drag&drop'">
-                    <label for="abs-path">Absolute path of directory :</label>
-                    <input id="abs-path" name="abs-path" type="text" required minlength="3" v-model="absPath">
 
-                    <div @drop.prevent="handleDrop" @dragenter="handleDragEnter" @dragover.prevent="" class="flex flex-col items-center justify-center py-10 text-center">
+                    <div @drop.prevent="handleDrop" @dragenter.prevent="handleDragEnter" @dragover.prevent class="flex flex-col items-center justify-center py-10 text-center bg-base-200">
                         <svg class="w-6 h-6 mr-1 text-current-50" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        <p class="m-0">Drag your files here or click in this area.</p>
+                        <p class="m-0 p-2">Drag your files here or click in this area.</p>
                     </div>
                 </div>
 
@@ -53,42 +50,37 @@
             </div>
         </div>
 
-        <dialog id="modal" ref="modal" class="modal">
-            <div class="modal-box">
-                <p v-if="success" id="success" class="text-center text-success">The book has been added to the database.</p>
-                <p v-else-if="draggedError" id="error" class="text-center text-error">An error has occured.</p>
-            </div>
-        </dialog>
+        <!-- Success info -->
+        <p v-if="success" id="success" class="text-center text-success">The book has been added to the database.</p>
+        <p v-else-if="draggedError" id="error" class="text-center text-error">An error has occured. {{draggedError}}</p>
 
-    <!-- </div> -->
+        <div v-if="added">
+            <h3 class="text-bold" v-if="added">Waiting for review</h3>
+
+            <ul>
+                <li v-for="(ebook,i) in added" :key="i">
+                    {{ebook}}
+                </li>
+            </ul>
+        </div>
+
+        
+
 </main>
 </template>
 
 <script setup>
 import SearchFormInput from '@/components/SearchFormInput.vue';
 import axios from '@/utils/apiRequester'
-import { useTemplateRef, ref, onMounted } from 'vue';
+import { listen } from '@tauri-apps/api/event';
+import { ref } from 'vue';
 
-const modal = useTemplateRef('modal')
 const success = ref(0)
-const absPath = ref('')
 const absFilePaths = ref([])
 const choice = ref(null)
-const draggedError = ref(false)
+const draggedError = ref('')
+const added = ref(null)
 
-// import { listen } from '@tauri-apps/api/event';
-
-// onMounted(() => {
-//   listen("tauri://drag-drop", (event) => {
-//     console.log("Tauri file drop event", event);
-//     if (event.payload && Array.isArray(event.payload)) {
-//       event.payload.forEach(filePath => {
-//         console.log("File dropped:", filePath);
-//         absFilePaths.value.push(filePath);
-//       });
-//     }
-//   });
-// });
 
 async function submit(event) {
     const elements = event.target.elements
@@ -105,44 +97,54 @@ async function submit(event) {
     if (ebook.genre.includes(', ')) {
         ebook.genre = ebook.genre.split(', ')
     }
-    // const res = await axios.post('ebooks', ebook)
-    const res = {"status" : 201}
-    if (res.status === 201) {
-        success.value = 1
+
+    try {
+        // const res = await axios.post('ebooks', ebook)
+        const res = {"status" : 201}
+        if (res.status === 201) {
+            success.value = 1
+            setTimeout(() => success.value = 0, 1000)
+        }
+    } catch(error) {
+        draggedError.value = str(e)
+        setTimeout(() => draggedError.value = '', 5000)
     }
-    modal.value.showModal()
-    setTimeout(() => modal.value.close(), 1000)
+    
 }
 
 function handleDragEnter(event) {
-    console.log("Entered the drag !", event, event.dataTransfer.types, event.dataTransfer.kind)
     event.preventDefault()
 }
 
-async function handleDrop(event) {
-    event.preventDefault()
-    // console.log(event.dataTransfer.items.length)
-    // console.log(event.dataTransfer.items)
-    console.log("dropped this, king", event)
-    if (!event.dataTransfer.items.length) {
-        console.log("Dropped event but nothing dropped ?!")
-        return
+listen("tauri://drag-drop", async (event) => {
+
+    console.log("Tauri file drop event", event);
+    console.log("Event payload", event.payload);
+    console.log("File paths", event.payload.paths);
+    const dragPaths = event.payload.paths;
+    if (!absFilePaths.value.length) {
+        absFilePaths.value = dragPaths;
+    } else {
+        for (let i=0; i < dragPaths.length; i++) {
+            absFilePaths.value.push(dragPaths[i])
+        }
     }
 
-    // console.log("items are", Array.from(event.dataTransfer.items))
-    Array.from(event.dataTransfer.items).forEach((el) => {
-        // console.log("This item is a", el.kind, "and its MIME type is", el.type)
-        // console.log(el)
-        const element = el.webkitGetAsEntry()
-        // console.log("element as webkitGetEntry", element)
-        let join_char = absPath.value.endsWith('/') || absPath.value.endsWith('\\') ? '' : '/'
-        absFilePaths.value.push([absPath.value, element.name].join(join_char))
-    })
-
-    const res = await axios.post('draggable', {"filepaths" : absFilePaths.value})
-    if (res.status_code !== 200) {
-        draggedError.value = true
+    try {
+        const res = await axios.post('dragged', {"filepaths" : dragPaths})
+        if (res.status === 200) {
+            success.value = 1
+            setTimeout(() => success.value = 0, 1000)
+            if (!added.value) added.value = res.data
+            else {
+                for (let i=0; i < ref.data.length; i++) {
+                    added.value.push(res.data[i])
+                }
+            }
+        }
+    } catch(error) {
+        draggedError.value = error
+        setTimeout(() => draggedError.value = '', 5000)
     }
-
-}
+});
 </script>

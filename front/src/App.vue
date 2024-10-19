@@ -4,16 +4,16 @@ import CurrentlyReading from '@/components/CurrentlyReading.vue';
 import ReadingLists from './components/ReadingLists.vue';
 import { useReadingListStore } from './stores/readingLists';
 import { onMounted } from 'vue';
+import { useAddingListStore } from './stores/addingList';
 
-const router = useRouter()
 const readingListStore = useReadingListStore()
-onMounted(async () => {
-  readingListStore.index()
-})
+const addingListStore = useAddingListStore()
 
-function addBook() {
-  router.push('ebooks/new');
-}
+onMounted(async () => {
+  readingListStore.index();
+  addingListStore.getAddingList()
+  console.log("App Here, called addingListStore and addingList is now", addingListStore.addingList)
+})
 
 </script>
 
@@ -29,6 +29,7 @@ function addBook() {
         </RouterLink>
       </div>
       <RouterLink to="/authors">Authors</Routerlink>
+      <RouterLink v-if="addingListStore.addingList" to="/addingList">Adding List</RouterLink>
     </nav>
     <div>
       <Suspense>
