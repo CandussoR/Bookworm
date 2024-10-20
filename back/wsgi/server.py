@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import json
 import socketserver
+from back.services.draggedService import DraggedController
 from back.services.ebookService import EbookController
 from back.services.libraryService import LibraryController
 from back.db import sqlite_db
@@ -8,34 +9,48 @@ from back.services.authorService import AuthorController
 from back.services.countriesService import CountryController
 from back.services.readingListService import ReadingListController
 from back.services.readingsService import ReadingsController
+from operator import itemgetter
 
 NEW_LINE = "\r\n"
 
 class MyHTTPService():
     @staticmethod
+    def get_headers(request : list[str]) -> dict:
+        headers = {}
+        [headers["method"], headers["uri"], _] = request[0].split(" ")
+        for line in request[1:]:
+            # Distinction between the headers and body since request split on new_line
+            if line == "":
+                break
+            k, v = line.split(': ')
+            headers[k] = v
+        return headers
+
+
+    @staticmethod
     def parse_request(request : bytes) -> dict:
         splitted_request = request.decode().split(NEW_LINE)
-        # Always creates at least an empty list for data, avoids unpacking errors
-        [method, uri, _] = splitted_request[0].split(" ")
-        endpoint = ""
+        headers = MyHTTPService.get_headers(splitted_request)
 
-        if method == 'OPTIONS':
-            return {"method" : "OPTIONS"}
+        if headers["method"] == 'OPTIONS':
+            return {"headers" : {"method" : "OPTIONS"}, "data" : ""}
 
-        elif method in ["GET", "DELETE"] :
-            if '?' in uri:
+        if headers["method"] in ["GET", "DELETE"] :
+            endpoint = ""
+            if '?' in headers["uri"]:
                 # With query params
-                endpoint, params = uri.rsplit("?", 1)
+                endpoint, params = headers["uri"].rsplit("?", 1)
                 if '&' in params:
                     params = params.split('&')
                     data = [p.split('=') for p in params]
                 else:
                     data = params.split('=')
             # Without query params
-            elif uri.count('/') > 2:
-                endpoint,*data = uri.rsplit("/", 1)
+            elif headers["uri"].count('/') > 2:
+                # TODO : Correct this if we ever use and endpoint with more then 3 slashes
+                endpoint,*data = headers["uri"].rsplit("/", 1)
             else:
-                endpoint = uri
+                endpoint = headers["uri"]
                 data = []
 
         else:
@@ -49,7 +64,11 @@ class MyHTTPService():
         elif data and '+' in data:
             # Cleans query params
             data = [d.replace('+', ' ') for d in data]
-        return {"method" : method, "uri" : endpoint if endpoint else uri, "data" : data}
+        
+        if endpoint:
+            headers["uri"] = endpoint
+        
+        return {"headers" : headers, "data" : data}
 
     @staticmethod
     def create_response_from(code, content_type, message):
@@ -79,22 +98,23 @@ class MyHTTPService():
 class RouterService():
     @staticmethod
     def call_service(uri, method, db, data) -> LibraryController:
-        # print("uri is ", uri, uri == 'api/authors', list(enumerate(uri)), list(enumerate('api/authors')))
 
         if not method in ['GET', 'POST', 'PUT', 'DELETE']:
             raise Exception("How the hell did you miss that?")
 
         match uri:
-            case '/api/authors':
-                return AuthorController(db, method, data)
             case '/api/ebooks':
                 return EbookController(db, method, data)
+            case '/api/authors':
+                return AuthorController(db, method, data)
             case '/api/countries':
                 return CountryController(db, method, data)
             case '/api/readings':
                 return ReadingsController(db, method, data)
             case '/api/reading_lists':
                 return ReadingListController(db, method, data)
+            case '/api/dragged':
+                return DraggedController(db, method, data)
             case _:
                 raise Exception("err... what did you want again ?")
 
@@ -102,19 +122,26 @@ class RouterService():
 class MyTCPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         request = self.request.recv(1024).strip()
-        print(request, type(request))
-        decoded_request = MyHTTPService.parse_request(request)
-        if decoded_request["method"] == 'OPTIONS':
-            code, message = 200, ""
+        headers, data = MyHTTPService.parse_request(request).values()
+
+        if headers["method"] == "OPTIONS":
+            code, message = 200, data
         else:
-            print(decoded_request)
+            # Axios always send Content-Length with a body
+            if headers.get("Content-Length") and data:
+                while len(data) < int(headers["Content-Length"]):
+                    new_chunk = self.request.recv(1024)
+                    if not new_chunk:
+                        break
+                    data += new_chunk.decode()
+
             env = json.loads(open('back/env.json', 'r').read())
             with sqlite_db.connect(env["database_test"]) as conn:
                 service = RouterService.call_service(
-                    decoded_request["uri"],
-                    decoded_request["method"],
+                    headers["uri"],
+                    headers["method"],
                     conn,
-                    decoded_request["data"],
+                    data
                 )
                 # Ignoring type because all the methods have to be implemented
                 # in child classes or app should break.
