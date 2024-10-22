@@ -2,7 +2,7 @@ import json
 import os
 from typing import Literal
 import pypdf
-import epub_metadata
+import ebookmeta
 
 from back.services.libraryService import LibraryController
 
@@ -13,6 +13,7 @@ class DraggedService():
         '''Creates or adds to the dragged elements file and return what has been
         added in order to add those elements in the front.'''
         
+        print("ENTER INIT OR ADD", flag, filepaths)
         data = {}
         added = []
 
@@ -20,10 +21,8 @@ class DraggedService():
             with open(json_path, 'r', encoding="utf-8") as fr:
                 data = json.loads(fr.read())
 
-        for f in filepaths:
-            metadata = self._get_file_metadata(f)
-            data[f] = metadata
-            added.append(data[f])
+        self.enrich_data(filepaths, data, added)
+
 
         with open(json_path, 'w', encoding="utf-8") as fw:
             json.dump(data, fw, indent = 4, separators=(',', ': '))
@@ -31,11 +30,34 @@ class DraggedService():
         return added
 
 
+    def enrich_data(self, filepaths, data, added) :
+        '''This mutates the data to insert in the dragged file and the added list.'''
+        for f in filepaths:
+            # We shall walk a whole directory if we drop one in there
+            if os.path.isdir(f):
+                paths  =[os.path.join(f, file) for file in os.listdir(f) if os.path.isfile(os.path.join(f, file))]
+                self.enrich_data(paths, data, added)
+                continue
+
+            if f in data:
+                continue
+
+            metadata = self._get_file_metadata(f)
+            # filtered_metadata = self._filter_metadata(metadata)
+
+            data[f] = metadata
+            added.append(data[f])
+
+
     def update_json_file(
         self, json_path: str, book_path: str, updated_book_metadata: dict
     ):
+        print("WE IN UPDATE_JSON_FILE TOO A LITTLE IT SEEMS")
         with open(json_path, 'r', encoding="utf-8") as fr:
             data_json = json.loads(fr.read())
+
+        assert book_path in data_json, f"Error in update_json_file (Dragged Service line 39) : {book_path} is not a key."
+
         data_json[book_path] = updated_book_metadata
         with open(json_path, 'w', encoding="utf-8") as fw:
             json.dump(data_json, fw, indent=4, separators=(',', ': '))
@@ -43,25 +65,54 @@ class DraggedService():
 
     def _get_file_metadata(self, filepath : str):
         _, ext = os.path.splitext(filepath)
+        print("ext is", ext, "--------------------------")
         if ext not in ['.pdf', '.epub']:
-            raise TypeError("File is not supported (only pdf and epub).")
+            raise TypeError(f"File is not supported (only pdf and epub) : {ext}")
 
         if ext == '.pdf':
             with open(filepath, 'rb') as fr:
                 reader = pypdf.PdfReader(fr)
                 metadata = self._convert_pdf_metadata(reader.metadata)
+                if not metadata:
+                    filename = os.path.basename(filepath)
+                    metadata["title"] = filename
 
         elif ext == '.epub':
-            epub = epub_metadata.epub(filepath)
-            metadata = epub.metadata
+            epub = ebookmeta.get_metadata(filepath)
+            metadata = self._convert_epub_metadata(epub)
+
 
         return metadata
 
+    def _filter_metadata(self, metadata) -> dict:
+        filtered = {}
+        
+        for k,v in metadata.items():
+            if k in ["author", "title"]:
+                filtered[k] = v
+            elif k in ["publisher", "ebx_publisher"]:
+                filtered["publisher"] = v
+        return filtered
+                
 
     def _convert_pdf_metadata(self, metadata):
         m = dict()
         for k, v in metadata.items():
-            m[k[1:].lower()] = v
+            # Translates /Author as author, for ex.
+            k = k[1:].lower()
+            if k == "author":
+                m[k] = v.split(',')
+            m[k] = v
+        return m
+
+
+    def _convert_epub_metadata(self, metadata) -> dict:
+        m = dict()
+        m["author"] = metadata.author_list
+        m["title"] = metadata.title
+        m["tags"] = metadata.tag_list
+        m["publisher"] = metadata.publish_info.publisher
+        m["year_of_publication"] = metadata.publish_info.year
         return m
 
 
