@@ -23,11 +23,7 @@
                         <th>Theme</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr v-for="(e, i) in ebooks" :key="e.ebook_guid">
-                        <EbookRow :ebook="e" :i="i" @get-ebooks-for="(key, value) => seeBooksFor(key, value)"/>
-                    </tr>
-                </tbody>
+                <TableBody :ebooks="ebooks" @get-ebooks-for="(key, value) => seeBooksFor(key, value)"/>
             </table>
         </div>
     </main>
@@ -37,7 +33,7 @@
 import { computed, onMounted, ref } from 'vue';
 import axios from '../utils/apiRequester';
 import { useRoute } from 'vue-router';
-import EbookRow from '@/components/EbookRow.vue';
+import TableBody from '@/components/TableBody.vue';
 import SearchDetailCard from '@/components/SearchDetailCard.vue';
 
 let ebooks = ref([]);

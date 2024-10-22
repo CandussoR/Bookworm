@@ -24,7 +24,7 @@ onMounted(async () => {
         <RouterLink to="/">
           Books 
         </RouterLink>
-        <RouterLink to="/ebooks/new">
+        <RouterLink to="/ebooks/add">
             <img class="cursor-pointer" src="@/assets/add.svg" alt="add-book">
         </RouterLink>
       </div>

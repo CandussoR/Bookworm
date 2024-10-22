@@ -74,13 +74,13 @@
                         <div id="searchResults">
                             <ul id="ebook-search-results" v-if="hasReceivedResponse && ebookSearchResult.length > 0">
                                 <li class="hover:cursor-pointer hover:bg-base-100 my-2 px-6 py-1"
-                                    v-for="(ebook, i) in ebookSearchResult" :key="ebook.ebook_guid"
+                                    v-for="ebook in ebookSearchResult" :key="ebook.ebook_guid"
                                     @click="addItem(ebook.ebook_guid)">
                                     {{ ebook.title }} ({{ ebook.author }})
                                 </li>
                             </ul>
                             <p v-else-if="hasReceivedResponse && ebookSearchResult.length == 0">
-                                No books related to your search.
+                                No books related to this search.
                             </p>
                         </div>
                     </form>
@@ -96,10 +96,10 @@
 
 <script setup>
 import { useReadingListStore } from '@/stores/readingLists';
-import { onMounted, ref, computed, useTemplateRef, watch} from 'vue';
+import { onMounted, ref, computed, useTemplateRef} from 'vue';
 import { useRoute } from 'vue-router';
 import axios from '../utils/apiRequester';
-import ReadSvg from '@/components/readSvg.vue';
+import ReadSvg from '@/components/ReadSvg.vue';
 
 const route = useRoute()
 const store = useReadingListStore()
@@ -122,7 +122,6 @@ onMounted(async () => {
     for (let i = 0; i < store.readingLists.length ; i++) {
         if (!(store.readingLists[i].reading_list_guid === route.params.guid)) continue;
         // Ugly af deep copy
-        console.log(store.readingLists[i])
         readingList.value = JSON.parse(JSON.stringify(store.readingLists[i]));
         readingListIndex.value = i;
         if (readingList.value.description) {

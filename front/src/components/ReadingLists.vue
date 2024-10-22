@@ -29,7 +29,7 @@
 
 <script setup>
 import { useReadingListStore } from '@/stores/readingLists';
-import { computed, onMounted, ref, useTemplateRef } from 'vue';
+import { computed, onMounted, ref} from 'vue';
 import { useRouter } from 'vue-router';
 import axios from '../utils/apiRequester';
 
@@ -37,7 +37,6 @@ const router = useRouter();
 const store = useReadingListStore();
 let readingLists = computed(() => store.readingLists)
 let newReadingListName = ref('');
-let myModal = useTemplateRef('myModal');
 let nameValidation = computed(() => newReadingListName.value.length > 1 && !store.readingLists.map(rl => rl.name).includes(newReadingListName.value))
 onMounted(async () => {
     try {
