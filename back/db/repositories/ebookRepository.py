@@ -8,6 +8,16 @@ class EbookRepository():
         if not id:
             ValueError("Identifier doesn't exist in database")
         return id
+    
+
+    def get_ebook_row_by(self, key, val) :
+        '''Gets a row without join either by ebook_id or ebook_guid.'''
+        if key in ["ebook_id", "ebook_guid"]:
+            return self.conn.execute(
+                'SELECT title, publisher_id, year_of_publication, ebook_guid, is_deleted FROM ebooks WHERE ? = ? ;'
+                ).fetchone()
+        else:
+            raise ValueError("Key must be ebook_id or ebook_guid")
 
 
     def get_ebooks(self):
@@ -29,12 +39,13 @@ class EbookRepository():
                     JOIN genres g ON g.genre_id = eg.genre_id
                     GROUP BY ebook_id
                 )
-                SELECT e.title, author, e.year_of_publication, p.publisher, genre, theme, e.ebook_guid
+                SELECT e.title, author, e.year_of_publication, p.publisher, genre, theme, e.ebook_guid, e.inserted_at
                 FROM ebooks e
                 JOIN ea ON ea.ebook_id = e.ebook_id
                 JOIN publishers p ON p.publisher_id = e.publisher_id
                 LEFT JOIN et ON ea.ebook_id = et.ebook_id
-                LEFT JOIN eg ON ea.ebook_id = eg.ebook_id;
+                LEFT JOIN eg ON ea.ebook_id = eg.ebook_id
+                WHERE e.is_deleted = 0;
               '''
         return self.conn.execute(sb).fetchall()
 
@@ -58,7 +69,7 @@ class EbookRepository():
 
     def get_ebook(self, ebook_id) -> tuple:
         '''We generally have to retrieve the id before making any change in the database so using the id is quite convenient.
-           Returns (title, author, year_of_publication, publisher, genre, theme, ebook_guid).
+           Returns (title, author, ebook_guid).
         '''
         sb = f'''WITH et AS (
             FROM ebooks_themes et
@@ -87,7 +98,7 @@ class EbookRepository():
     
 
     def update(self, model):
-        self.conn.execute('''UPDATE TABLE ebooks
+        self.conn.execute('''UPDATE ebooks
                             SET title = :title,
                                 year_of_publication = :year_of_publication,
                                 publisher_id = :publisher_id
@@ -96,8 +107,11 @@ class EbookRepository():
         )
 
 
-    def delete(self, guid):
-        self.conn.execute("DELETE FROM ebooks WHERE ebook_guid = ?", [guid])
+    def delete(self, guid, wipe = False):
+        if wipe:
+            self.conn.execute("DELETE FROM ebooks WHERE ebook_guid = ?", [guid])
+        else:
+            self.conn.execute("UPDATE ebooks SET is_deleted = 1 WHERE ebook_guid = ?", [guid])
 
 
     def get_ebooks_by(self, key, value):

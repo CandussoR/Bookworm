@@ -50,8 +50,11 @@ CREATE TABLE IF NOT EXISTS ebooks(
      year_of_publication INTEGER,
      publisher_id INTEGER,
      ebook_guid TEXT UNIQUE NOT NULL,
+     inserted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     is_deleted INTEGER NOT NULL DEFAULT 0,
      FOREIGN KEY (publisher_id) REFERENCES publishers (publisher_id)
 );
+CREATE INDEX IF NOT EXISTS ebooks_inserted_at ON ebooks(inserted_at);
 CREATE TABLE IF NOT EXISTS ebooks_authors(
      ebook_id INTEGER NOT NULL,
      author_id INTEGER NOT NULL,

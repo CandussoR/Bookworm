@@ -7,6 +7,7 @@ from back.db.repositories.authorRepository import AuthorRepository
 from back.db.repositories.crossTableRepository import CrossTableRepository
 from back.db.repositories.genreRepository import GenreRepository
 from back.db.repositories.publisherRepository import PublisherRepository
+from back.db.repositories.readings_repository import ReadingsRepository
 from back.db.repositories.themeRepository import ThemeRepository
 from back.services.authorService import AuthorModel
 from back.services.baseRequest import BaseRequest
@@ -43,6 +44,7 @@ class EbookModel():
     publisher_id : int 
     year_of_publication : int
     ebook_guid : str
+    is_deleted : int = 0
     
     def new_guid(self):
         self.ebook_guid = str(uuid4())
@@ -57,6 +59,7 @@ class EbookResource():
     genre : str
     theme : str
     ebook_guid : str
+    inserted_at : str
     country: str = ''
 
     def __post_init__(self):
@@ -159,10 +162,18 @@ class EbookService():
     def delete(self, guid):
         UUID(guid)
         ebook_id = self.repository.get_id_from_guid(guid)
+
+        # If the book has been read, only update is_deleted for reading history
+        is_read = ReadingsRepository(self.conn).is_ebook_read(ebook_id)
+        if is_read:
+            self.repository.delete(guid, wipe=False)
+            return
+
+        # If not read and deleted, get it out of here
         ct_repo = CrossTableRepository(self.conn)
         for table in ["ebooks_authors", "ebooks_themes", "ebooks_genres"]:
             ct_repo.delete(table, ebook_id)
-        self.repository.delete(guid)
+        self.repository.delete(guid, wipe = True)
 
     
     def _create_repo(self, key):
