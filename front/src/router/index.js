@@ -25,9 +25,19 @@ const router = createRouter({
       component: () => import('../views/ReadingListView.vue')
     },
     {
-      path: '/ebooks/new',
+      path: '/ebooks/add',
       name: 'newEbook',
-      component: () => import('../views/AddBookView.vue')
+      component: () => import('../views/AddBook/AddBookView.vue')
+    },
+    {
+      path: '/ebooks/add/manual',
+      name: 'newEbookManual',
+      component: () => import('../views/AddBook/AddBookManually.vue')
+    },
+    {
+      path: '/ebooks/add/dragDrop',
+      name: 'newEbookDragDrop',
+      component: () => import('../views/AddBook/AddBookDragDrop.vue')
     },
     {
       path: '/addingList',
