@@ -153,9 +153,18 @@ class DraggedController(LibraryController):
         
 
     def do_DELETE(self):
+        assert(isinstance(self.data["filepath"], str) or isinstance(self.data["filepath"], list))
+
         with open(self.file, 'r', encoding="utf-8") as fr:
             data_json = json.loads(fr.read())
-        del data_json[self.data["filepath"]]
+
+        if isinstance(self.data["filepath"], str):
+            del data_json[self.data["filepath"]]
+        elif isinstance(self.data["filepath"], list):
+            for f in self.data["filepath"]:
+                del data_json[self.data["filepath"]]
+
         with open(self.file, 'w', encoding="utf-8") as fw:
             json.dump(data_json, fw, indent=4, separators=(',', ': '))
-        return 200, 'Deleted.'
+
+        return 200, 'Successfully deleted.'
