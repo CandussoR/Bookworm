@@ -1,7 +1,7 @@
 <template>
 
-    <div class="w-full p-5 overflow-x-auto">
-        <table class="table table-zebra min-w-full">
+    <div id="table-container" class="w-full p-5 overflow-x-auto">
+        <table id="metadata-table" class="table table-zebra min-w-full">
             <thead>
                 <tr>
                     <th scop="col">Path</th>
@@ -15,7 +15,8 @@
             </thead>
 
             <tbody>
-                <tr v-for="(e, path, i) in props.ebooks" :key="i">
+                <tr v-for="(e, path, i) in props.ebooks" :key="i" @click="selectRow(i, path)"
+                    :class="[selected.includes(i) ? '!bg-calm-green text-primary-content' : '']">
                     <td dir="rtl"
                         class="whitespace-nowrap overflow-hidden text-ellipsis lg:max-w-[250px] max-w-[150px]">{{ path
                         }}</td>
@@ -50,10 +51,20 @@
                 </tr>
             </tbody>
         </table>
+
+        <div id="button-row" v-if="selected.length > 0" class="flex justify-center">
+            <button id="edit" class="btn btn-neutral mr-1">Edit</button>
+            <button id="delete" class="btn btn-neutral mr-1" @click="deleteBook">Delete</button>
+            <button id="cancel" class="btn btn-neutral" @click="selected = []">Cancel</button>
+        </div>
     </div>
+
+
 </template>
 
 <script setup>
+import { ref } from 'vue';
+
 const props = defineProps({
     ebooks : {
         required : true,
@@ -61,4 +72,23 @@ const props = defineProps({
     }
 })
 
+const selected = ref([])
+const selectedFilesPath = ref([])
+
+function selectRow(i, path) {
+    const arrIndex = selected.value.findIndex(el => el === i)
+    if (arrIndex !== -1) {
+        selected.value.splice(arrIndex, 1)
+        selectedFilesPath.value.splice(arrIndex, 1)
+        return
+    }
+
+    selected.value.push(i)
+    selectedFilesPath.value.push(path)
+}
+
+async function deleteBook() {
+    const res = await axios.delete('dragged', {filepath : selectedFilesPath})
+
+}
 </script>
