@@ -15,7 +15,7 @@
             </thead>
 
             <tbody>
-                <tr v-for="(e, path, i) in props.ebooks" :key="i" @click="selectRow(i, path)"
+                <tr v-for="(e, path, i) in ebooks" :key="i" @click="selectRow(i, path)"
                     :class="[selected.includes(i) ? '!bg-calm-green text-primary-content' : '']">
                     <td dir="rtl"
                         class="whitespace-nowrap overflow-hidden text-ellipsis lg:max-w-[250px] max-w-[150px]">{{ path
@@ -63,17 +63,26 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { useAddingListStore } from '@/stores/addingList';
+import { computed, onMounted, ref } from 'vue';
+import axios from '@/utils/apiRequester'
 
+const store = useAddingListStore()
+const selected = ref([])
+const selectedFilesPath = ref([])
+const error = ref('')
 const props = defineProps({
     ebooks : {
-        required : true,
-        type: Object
+        required : false,
+        type : Object
     }
 })
 
-const selected = ref([])
-const selectedFilesPath = ref([])
+const ebooks = computed(() => props.ebooks || store.addingList)
+
+onMounted(async () => {
+    await store.getAddingList()
+})
 
 function selectRow(i, path) {
     const arrIndex = selected.value.findIndex(el => el === i)
@@ -88,7 +97,19 @@ function selectRow(i, path) {
 }
 
 async function deleteBook() {
-    const res = await axios.delete('dragged', {filepath : selectedFilesPath})
-
+    try {
+        console.log("selectedFilesPath that I am sending", selectedFilesPath.value)
+        const res = await axios.delete('dragged', { data :{ "filepath" : selectedFilesPath.value } })
+        if (res.status == 200) {
+            // Updating store
+            selectedFilesPath.forEach(element => {
+                if (element in store.addingList.value) {
+                    delete store.addingList.value[element]
+                }
+            });
+        }
+    } catch (error) {
+        error.value = error
+    }
 }
 </script>

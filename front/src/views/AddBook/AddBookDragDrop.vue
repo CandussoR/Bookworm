@@ -14,20 +14,16 @@
 
 
         <!-- Success info -->
-        <p v-if="success === 1" id="success" class="text-center text-success">The book has been added to the database.</p>
-        <p v-else-if="success === 2" class="text-center">Book already present in the database or waiting to be added.</p>
-        <p v-else-if="draggedError" id="error" class="text-center text-error">An error has occured. {{draggedError}}</p>
+        <p id="success-test" class="text-center text-success">{{successTest}}</p>
+        <!-- <p v-else-if="draggedError" id="error" class="text-center text-error">An error has occured. {{draggedError}}</p> -->
 
         <!-- Books added this session, open for review -->
         <div v-if="added">
             <h3 class="text-bold" v-if="added">Waiting for review</h3>
 
-            <ul>
-                <li v-for="(ebook,i) in added" :key="i">
-                    {{ebook}}
-                </li>
-            </ul>
+            <EditableMetadataTable :ebooks="added"/>
         </div>
+
     </main>
 </template>
 
@@ -35,19 +31,22 @@
 import { useAddingListStore } from '@/stores/addingList';
 import { listen } from '@tauri-apps/api/event';
 import { ref } from 'vue';
+import axios from '@/utils/apiRequester';
+import EditableMetadataTable from '@/components/EditableMetadataTable.vue';
 
 const store = useAddingListStore()
 const dropTriggered = ref(false)
 const dropTriggeredTimeout = ref(null)
 const draggedError = ref(null)
 const added = ref(null)
+const successTest = ref(null)
 
 listen("tauri://drag-drop", async (event) => {
     if (dropTriggered.value) return;
 
-   handleDropTriggered()
+    handleDropTriggered()
 
-   handleDrop(event.payload.paths);
+    handleDrop(event.payload.paths);
 })
 
 /**
@@ -67,17 +66,20 @@ async function handleDrop(paths) {
 
     try {
         const res = await axios.post('dragged', {"filepaths" : paths})
+        console.log(res)
 
         if (res.status === 200) {
-            setTimeout(() => success.value = 0, 2000)
+            console.log(res)
+            setTimeout(() => successTest.value = null, 2000)
             if (!res.data.length) {
-                success.value = 2
+                // success.value = 2
                 return
             }
 
             if (!added.value) {
                 added.value = res.data
-                success.value = 1
+                // success.value = 1
+                successTest.value = "Yup"
                 for (let i=0; i < ref.data.length; i++) {
                     store.addingList.push(res.data[i])
                 } 
@@ -90,12 +92,14 @@ async function handleDrop(paths) {
             }
         }
     } catch(error) {
-        draggedError.value = error
-        setTimeout(() => draggedError.value = '', 5000)
+        // draggedError.value = error
+        // setTimeout(() => draggedError.value = '', 5000)
     }
 }
 </script>
 
 <style>
-
+.sucess-test:empty {
+    display : none;
+}
 </style>
