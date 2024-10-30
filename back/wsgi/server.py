@@ -30,45 +30,45 @@ class MyHTTPService():
     @staticmethod
     def parse_request(request : bytes) -> dict:
         splitted_request = request.decode().split(NEW_LINE)
+        print("REQUEST CAME IN, FIRST BUFFER", splitted_request)
         headers = MyHTTPService.get_headers(splitted_request)
+        endpoint = headers["uri"]
 
+        # Preflight, it's about sending a message
         if headers["method"] == 'OPTIONS':
             return {"headers" : {"method" : "OPTIONS"}, "data" : ""}
 
-        if headers["method"] in ["GET", "DELETE"] :
-            endpoint = ""
-            if '?' in headers["uri"]:
-                # With query params
-                endpoint, params = headers["uri"].rsplit("?", 1)
-                if '&' in params:
-                    params = params.split('&')
-                    data = [p.split('=') for p in params]
-                else:
-                    data = params.split('=')
-            # Without query params
-            elif headers["uri"].count('/') > 2:
-                # TODO : Correct this if we ever use and endpoint with more then 3 slashes
-                endpoint,*data = headers["uri"].rsplit("/", 1)
+        # With query params
+        if headers["method"] in ["GET", "DELETE"] and '?' in headers["uri"]:
+            endpoint, params = headers["uri"].rsplit("?", 1)
+            if '&' in params:
+                params = params.split('&')
+                data = [p.split('=') for p in params]
             else:
-                endpoint = headers["uri"]
-                data = []
-
-        else:
-            # No post or put without a json body, so no query in uri
-            # Breaks with Value Error if no body but POST or PUT
-            separator = splitted_request.index('')
-            data = "\r\n".join(splitted_request[separator+1:])
-
-        if not data:
-            data = None
-        elif data and '+' in data:
+                data = params.split('=')
             # Cleans query params
             data = [d.replace('+', ' ') for d in data]
-        
-        if endpoint:
+            # Gets the uri without its params
             headers["uri"] = endpoint
+
+        # Without query params, 
+        # /api/sth -> two slashes, if we need one more, up until now it's a guid
+        elif headers["method"] in ["GET", "DELETE"] & headers["uri"].count('/') > 2: 
+            # TODO : Correct this if we ever use and endpoint with more then 3 slashes
+            headers["uri"],*data = headers["uri"].rsplit("/", 1)
+
+        # We only get a request without data if it's a get, so we can check it at this point
+        elif headers["method"] == "GET":
+            data = None
+
+        else:
+            # If we came this far, the request MUST have a body.
+            # This has to break and does so with Value Error.
+            separator = splitted_request.index('')
+            data = "\r\n".join(splitted_request[separator+1:])
         
         return {"headers" : headers, "data" : data}
+
 
     @staticmethod
     def create_response_from(code, content_type, message):
@@ -134,6 +134,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
                     if not new_chunk:
                         break
                     data += new_chunk.decode()
+                    print(len(data), int(headers["Content-Length"]))
 
             env = json.loads(open('back/env.json', 'r').read())
             with sqlite_db.connect(env["database_test"]) as conn:
