@@ -71,6 +71,7 @@ const store = useAddingListStore()
 const selected = ref([])
 const selectedFilesPath = ref([])
 const error = ref('')
+const resReceived = ref(false)
 const props = defineProps({
     ebooks : {
         required : false,
@@ -98,15 +99,19 @@ function selectRow(i, path) {
 
 async function deleteBook() {
     try {
-        console.log("selectedFilesPath that I am sending", selectedFilesPath.value)
         const res = await axios.delete('dragged', { data :{ "filepath" : selectedFilesPath.value } })
+        if (resReceived.value == true) return
+        resReceived.value = true
+
         if (res.status == 200) {
             // Updating store
-            selectedFilesPath.forEach(element => {
-                if (element in store.addingList.value) {
-                    delete store.addingList.value[element]
+            selectedFilesPath.value.forEach(element => {
+                if (element in store.addingList) {
+                    delete store.addingList[element]
                 }
-            });
+            }
+        );
+            selectedFilesPath.value = []
         }
     } catch (error) {
         error.value = error
