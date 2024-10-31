@@ -53,7 +53,7 @@ class MyHTTPService():
 
         # Without query params, 
         # /api/sth -> two slashes, if we need one more, up until now it's a guid
-        elif headers["method"] in ["GET", "DELETE"] & headers["uri"].count('/') > 2: 
+        elif headers["method"] in ["GET", "DELETE"] and headers["uri"].count('/') > 2: 
             # TODO : Correct this if we ever use and endpoint with more then 3 slashes
             headers["uri"],*data = headers["uri"].rsplit("/", 1)
 
@@ -75,8 +75,7 @@ class MyHTTPService():
         status = {
             200: "OK",
             201: "Resource created",
-            204: "No content",
-            400: "Bad Request",
+            204: "No content", 400: "Bad Request",
             404: "Not found",
             500: "Internal Server Error",
             501: "Not Implemented",

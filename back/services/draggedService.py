@@ -9,13 +9,13 @@ from back.services.libraryService import LibraryController
 class DraggedService():
     def init_or_add_to_file(
         self, json_path: str, flag: Literal["init", "add"], filepaths: list[str]
-    ) -> list[dict]:
+    ) -> dict:
         '''Creates or adds to the dragged elements file and return what has been
         added in order to add those elements in the front.'''
         
         print("ENTER INIT OR ADD", flag, filepaths)
         data = {}
-        added = []
+        added = {}
 
         if os.path.isfile(json_path):
             with open(json_path, 'r', encoding="utf-8") as fr:
@@ -45,14 +45,12 @@ class DraggedService():
             metadata = self._get_file_metadata(f)
             # filtered_metadata = self._filter_metadata(metadata)
 
-            data[f] = metadata
-            added.append(data[f])
+            data[f] = added[f] = metadata
 
 
     def update_json_file(
         self, json_path: str, book_path: str, updated_book_metadata: dict
     ):
-        print("WE IN UPDATE_JSON_FILE TOO A LITTLE IT SEEMS")
         with open(json_path, 'r', encoding="utf-8") as fr:
             data_json = json.loads(fr.read())
 
@@ -65,7 +63,6 @@ class DraggedService():
 
     def _get_file_metadata(self, filepath : str):
         _, ext = os.path.splitext(filepath)
-        print("ext is", ext, "--------------------------")
         if ext not in ['.pdf', '.epub']:
             raise TypeError(f"File is not supported (only pdf and epub) : {ext}")
 
@@ -101,7 +98,7 @@ class DraggedService():
             # Translates /Author as author, for ex.
             k = k[1:].lower()
             if k == "author":
-                m[k] = v.split(',')
+                m[k] = v.split(',') if ',' in v else [v]
             m[k] = v
         return m
 
@@ -122,7 +119,6 @@ class DraggedController(LibraryController):
         self.method = method
         self.data = json.loads(data) if data else {}
 
-
     def do_GET(self):
         if not (self.file):
             return 200, {}
@@ -130,7 +126,6 @@ class DraggedController(LibraryController):
         with open(self.file, 'r', encoding="utf-8") as fr:
             file = fr.read()
         return 200, file
-    
 
     def do_POST(self):
         assert("filepaths" in self.data and isinstance(self.data["filepaths"], list))
@@ -142,7 +137,6 @@ class DraggedController(LibraryController):
         except Exception as e:
             return 500, 'Error during the writing of the json file : ' + str(e)
 
-
     def do_PUT(self):
         assert(len(self.data.keys()) == 2 and 'filepath' in self.data and 'metadata' in self.data) 
         try:
@@ -150,10 +144,12 @@ class DraggedController(LibraryController):
             return 200, ''
         except Exception as e:
             return 500, 'Error during the update of the json file : ' + str(e)
-        
 
     def do_DELETE(self):
-        assert(isinstance(self.data["filepath"], str) or isinstance(self.data["filepath"], list))
+        assert "filepath" in self.data and (
+            isinstance(self.data["filepath"], str)
+            or isinstance(self.data["filepath"], list)
+        )
 
         with open(self.file, 'r', encoding="utf-8") as fr:
             data_json = json.loads(fr.read())
@@ -162,7 +158,7 @@ class DraggedController(LibraryController):
             del data_json[self.data["filepath"]]
         elif isinstance(self.data["filepath"], list):
             for f in self.data["filepath"]:
-                del data_json[self.data["filepath"]]
+                del data_json[f]
 
         with open(self.file, 'w', encoding="utf-8") as fw:
             json.dump(data_json, fw, indent=4, separators=(',', ': '))
