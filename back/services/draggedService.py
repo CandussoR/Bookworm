@@ -99,6 +99,7 @@ class DraggedService():
             k = k[1:].lower()
             if k == "author":
                 m[k] = v.split(',') if ',' in v else [v]
+                continue
             m[k] = v
         return m
 
