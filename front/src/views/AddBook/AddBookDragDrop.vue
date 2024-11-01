@@ -1,7 +1,8 @@
 <template>
     <main class="flex flex-col align-center">
+        <h1 class="text-center text-xl text-bold my-10">Drag & Drop</h1>
         <!-- Drag&Drop -->
-        <div @drop.prevent="handleDrop" @dragenter.prevent="handleDragEnter" @dragover.prevent class="mt-5 bg-base-200 py-2 rounded">
+        <div class="mt-5 bg-base-200 py-2 rounded">
             <div id="drag-drop-inside" class="flex flex-col border-2 rounded m-5 p-10 items-center justify-center text-center">
                 <svg class="w-8 h-8 mr-1 text-current-50" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                     stroke="currentColor">
@@ -14,14 +15,14 @@
 
 
         <!-- Success info -->
-        <p id="success-test" class="text-center text-success">{{successTest}}</p>
-        <!-- <p v-else-if="draggedError" id="error" class="text-center text-error">An error has occured. {{draggedError}}</p> -->
+        <p id="success" class="text-center text-success">{{success}}</p>
+        <p id="error" class="text-center text-error">{{draggedError}}</p>
 
         <!-- Books added this session, open for review -->
-        <div v-if="added">
-            <h3 class="text-bold" v-if="added">Waiting for review</h3>
+        <div class="mt-5" ref="table">
+            <h3 class="text-lg text-bold text-center" v-if="added && Object.keys(added).length > 0">Waiting for review</h3>
 
-            <EditableMetadataTable :ebooks="added"/>
+            <EditableMetadataTable v-if="added && Object.keys(added).length > 0" :ebooks="added" @deleted="deleteFromAdded($event)"/>
         </div>
 
     </main>
@@ -30,76 +31,107 @@
 <script setup>
 import { useAddingListStore } from '@/stores/addingList';
 import { listen } from '@tauri-apps/api/event';
-import { ref } from 'vue';
+import { ref, useTemplateRef, watch } from 'vue';
 import axios from '@/utils/apiRequester';
 import EditableMetadataTable from '@/components/EditableMetadataTable.vue';
 
 const store = useAddingListStore()
-const dropTriggered = ref(false)
-const dropTriggeredTimeout = ref(null)
 const draggedError = ref(null)
 const added = ref(null)
-const successTest = ref(null)
+const success = ref(null)
+const table = useTemplateRef("table")
+const dropEvents = ref([])
+const processingDropEvent = ref(null)
 
 listen("tauri://drag-drop", async (event) => {
-    if (dropTriggered.value) return;
+    // Couldn't prevent random firing of 10 events instead of one
+    // So we'll put it all in some kind a queue thing and unqueue from there
+    // This is shit though, but if it works it could be worse
+    dropEvents.value.push(event)
 
-    handleDropTriggered()
-
-    handleDrop(event.payload.paths);
+    if (processingDropEvent.value) {
+        return ;
+    }
+    processingDropEvent.value = true
 })
 
-/**
- * Sort of a debounce function to limit the number of requests to the back
- * for each drop to one.
- **/
- function handleDropTriggered() {
-    dropTriggered.value = true
-    if (dropTriggeredTimeout.value) {
-        clearTimeout(dropTriggeredTimeout.value)
+watch(processingDropEvent, async (val, oldVal) => {
+    if (!val) return;
+    await handleDrop(dropEvents.value[0].payload.paths)
+    const nextEvent = checkEventsHaveDifferentPaths()
+
+    while (nextEvent) {
+        await handleDrop(nextEvent.payload.paths)
+        nextEvent = checkEventsHaveDifferentPaths()
     }
-    setTimeout(() => dropTriggered.value = false, 1000)
-}
+
+    processingDropEvent.value = false
+})
 
 
 async function handleDrop(paths) {
 
     try {
-        const res = await axios.post('dragged', {"filepaths" : paths})
-        console.log(res)
+        const res = await axios.post('dragged', { "filepaths": paths })
 
-        if (res.status === 200) {
-            console.log(res)
-            setTimeout(() => successTest.value = null, 2000)
-            if (!res.data.length) {
-                // success.value = 2
-                return
-            }
-
-            if (!added.value) {
-                added.value = res.data
-                // success.value = 1
-                successTest.value = "Yup"
-                for (let i=0; i < ref.data.length; i++) {
-                    store.addingList.push(res.data[i])
-                } 
-                return
-            }
-
-            for (let i=0; i < ref.data.length; i++) {
-                added.value.push(res.data[i])
-                store.addingList.push(res.data[i])
-            }
+        if (!res.status == 200) {
+            draggedError.value = res.data
+            return
         }
-    } catch(error) {
-        // draggedError.value = error
-        // setTimeout(() => draggedError.value = '', 5000)
+
+        setTimeout(() => success.value = '', 2000)
+        if (!Object.keys(res.data).length) {
+            success.value = "Books already in the database or already waiting for review."
+            return
+        }
+
+        success.value = "Books added to the database."
+
+        const resDataKeys = Object.keys(res.data)
+
+        if (!added.value) {
+            added.value = res.data
+        } else {
+            resDataKeys.forEach(p => {
+                added.value[p] = res.data[p]
+            })
+        }
+        
+        resDataKeys.forEach(p => {
+            store.addingList[p] = res.data[p]
+        })
+        table.value.focus()
+    } catch (error) {
+        draggedError.value = error
+        setTimeout(() => draggedError.value = '', 5000)
     }
+}
+
+
+function checkEventsHaveDifferentPaths() {
+    const handled = dropEvents.value.splice(0,1);
+    while (dropEvents.value.length > 0) {
+        const nextEvent = dropEvents.value.splice(0,1);
+        // Slow as hell, won't bark while it works
+        if (JSON.stringify(handled.payload.paths) === JSON.stringify(nextEvent.payload.paths)) {
+            continue;
+        }
+        return nextEvent
+    }
+    return null
+}
+
+function deleteFromAdded(paths) {
+    paths.forEach(element => {
+       delete added.value[element]
+    });
+    if (!Object.keys(added).length) added.value = null
 }
 </script>
 
 <style>
-.sucess-test:empty {
+#sucess:empty,
+#error:empty {
     display : none;
 }
 </style>
