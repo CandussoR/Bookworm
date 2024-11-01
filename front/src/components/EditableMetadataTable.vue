@@ -71,18 +71,21 @@ const store = useAddingListStore()
 const selected = ref([])
 const selectedFilesPath = ref([])
 const error = ref('')
-const resReceived = ref(false)
+// const resReceived = ref(false)
 const props = defineProps({
     ebooks : {
         required : false,
         type : Object
     }
 })
+const emit = defineEmits(['deleted'])
 
 const ebooks = computed(() => props.ebooks || store.addingList)
 
 onMounted(async () => {
-    await store.getAddingList()
+    if (!props.ebooks) {
+        await store.getAddingList()
+    }
 })
 
 function selectRow(i, path) {
@@ -100,17 +103,22 @@ function selectRow(i, path) {
 async function deleteBook() {
     try {
         const res = await axios.delete('dragged', { data :{ "filepath" : selectedFilesPath.value } })
-        if (resReceived.value == true) return
-        resReceived.value = true
 
         if (res.status == 200) {
-            // Updating store
+            if (props.ebooks) {
+                emit("deleted", selectedFilesPath.value)
+                return
+            }
+
+            // Updating store if we're not in the DragDrop view, else no use
             selectedFilesPath.value.forEach(element => {
                 if (element in store.addingList) {
                     delete store.addingList[element]
                 }
             }
+
         );
+
             selectedFilesPath.value = []
         }
     } catch (error) {
