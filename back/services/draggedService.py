@@ -73,6 +73,10 @@ class DraggedService():
                 if not metadata:
                     filename = os.path.basename(filepath)
                     metadata["title"] = filename
+                if not "theme" in metadata :
+                    metadata["theme"] = []
+                if not "genre" in metadata :
+                    metadata["genre"] = []
 
         elif ext == '.epub':
             epub = ebookmeta.get_metadata(filepath)
@@ -111,6 +115,8 @@ class DraggedService():
         m["tags"] = metadata.tag_list
         m["publisher"] = metadata.publish_info.publisher
         m["year_of_publication"] = metadata.publish_info.year
+        m["genre"] = []
+        m["theme"] = []
         return m
 
 
