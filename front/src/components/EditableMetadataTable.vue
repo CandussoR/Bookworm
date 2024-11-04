@@ -15,7 +15,10 @@
             </thead>
 
             <tbody>
-                <tr v-for="(e, path, i) in ebooks" :key="i" @click="selectRow(i, path)"
+                <tr v-for="(e, path, i) in ebooks" :key="i" 
+                    @click.exact="handleRowSelect(i, path)"
+                    @click.shift="handleRowSelectFromLastOne(i)"
+                    @click.ctrl="handleRowSelect(i,path)"
                     :class="[selected.includes(i) ? '!bg-calm-green text-primary-content' : '']">
                     <td dir="rtl"
                         class="whitespace-nowrap overflow-hidden text-ellipsis lg:max-w-[250px] max-w-[150px]">{{ path
@@ -88,7 +91,7 @@ onMounted(async () => {
     }
 })
 
-function selectRow(i, path) {
+function handleRowSelect(i, path) {
     const arrIndex = selected.value.findIndex(el => el === i)
     if (arrIndex !== -1) {
         selected.value.splice(arrIndex, 1)
@@ -98,6 +101,26 @@ function selectRow(i, path) {
 
     selected.value.push(i)
     selectedFilesPath.value.push(path)
+}
+
+function handleRowSelectFromLastOne(selectedI) {
+    let keys = props.ebooks ? Object.keys(props.ebooks) : Object.keys(store.addingList);
+    
+    const arrIndex = selected.value.findIndex(el => el === selectedI)
+    const lastSelected = selected.value.length ? selected.value[selected.value.length - 1] : 0;
+
+    if (arrIndex !== -1 && arrIndex < selected.value.length - 1) {
+        selected.value.splice(arrIndex +1, selected.value.length - 1 - arrIndex)
+        selectedFilesPath.value.splice(arrIndex +1, selected.value.length - 1 - arrIndex)
+        return
+    }
+
+    for (let i = lastSelected ; i <= selectedI ; i++) {
+        if (selected.value.includes(keys[i])) continue;
+
+        selected.value.push(i);
+        selectedFilesPath.value.push(keys[i].path);
+    }
 }
 
 async function deleteBook() {
