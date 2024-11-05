@@ -7,7 +7,7 @@
                 <SearchFormInput ebook-property="title" :placeholder="titlePlaceholder" autofocus required />
 
                 <label id="author">Author</label>
-                <SearchFormInput ebook-property="author" :placeholder="authorPlaceholder" required />
+                <SearchFormInput ebook-property="author" :placeholder="authorPlaceholder" required/>
 
                 <label id="publisher">Publisher</label>
                 <SearchFormInput ebook-property="publisher" :placeholder="publisherPlaceholder" required />
@@ -50,31 +50,51 @@ const genrePlaceholder = computed(() => getArrayValue("genre"))
 const themePlaceholder = computed(() => getArrayValue("theme"))
 
 
-function changeAll(key, value) {
-    props.ebooks.forEach(el => el[key] = value)
-}
+// function changeAll(key, val) {
+//     console.log("change all", key, "to ", val)
+//     // props.ebooks.forEach(el => ewl[key] = value)
+// }
 
 
-function submit() {
+function submit(event) {
+    const elements = event.target.elements
+    const formFields = ['title', 'author', 'publisher', 'theme', 'genre']
+
+    // We should be able to do better...
+    for (let i = 0; i < formFields.length ; i++) {
+        const field = elements.namedItem([formFields[i]]).value
+        if (!["Various", ""].includes(field)) {
+            for (ebook in props.ebooks) {
+                if (["author", "theme", "genre"].includes(formFields[i])) {
+                    ebook[formFields[i]] = field.split(', ')
+                    continue
+                }
+                ebook[formFields[i]] = field
+            }
+        }
+    }
+    
     emit('updated', props.ebooks)
 }
 
 
 function getValue(ppty) {
-    if (props.keys.length === 1) return props.ebooks[props.keys[0]][ppty]
+    if (props.keys.length === 1) return ppty in props.ebooks[props.keys[0]] ? props.ebooks[props.keys[0]][ppty] : ''
 
-    let res = ''
+    let returnValue = ''
 
     for (let i=0 ; i < props.keys.length; i++) {
         const k = props.keys[i]
-        if (res === '') {
-            res = props.ebooks[k][ppty]
+        if (!(ppty in props.ebooks[k])) {
             continue
-        } else if (props.ebooks[k][ppty] !== res) {
+        } else if (returnValue === '' && props.ebooks[k][ppty]) {
+            returnValue = props.ebooks[k][ppty]
+            continue
+        } else if (props.ebooks[k][ppty] !== returnValue) {
             return "Various"
         }
     }
-    return res
+    return returnValue
 }
 
 
@@ -86,14 +106,27 @@ function getValue(ppty) {
  * 
  **/
 function getArrayValue(ppty) {
+    console.log(props.keys.length === 1)
     if (props.keys.length === 1) {
-        return props.ebooks[props.keys[0]][ppty].join(", ")
+        try {
+
+            return ppty in props.ebooks[props.keys[0]] ? props.ebooks[props.keys[0]][ppty].join(", ") : ''
+        } catch(error) {
+            console.warn("Erreur au chargement du tableau", 
+            ppty,
+            props.ebooks[props.keys[0]], props.keys, 
+            props.ebooks[props.keys[0]],
+            props.ebooks[props.keys[0]][ppty])
+            return
+        }
     }
 
     let arrVal = []
     for (let i=0 ; i < props.keys.length ; i++) {
         const k = props.keys[i]
-        if (!arrVal.length) {
+        if (!(ppty in props.ebooks[k])) {
+            continue
+        } else if (!arrVal.length) {
             arrVal = props.ebooks[k][ppty]
             continue
         } else if (props.ebooks[k][ppty].length !== arrVal.length) {
@@ -106,8 +139,10 @@ function getArrayValue(ppty) {
             }
         }
     }
-    return arrVal.join(", ")
+    return typeof(arrVal) === 'object' ? arrVal.join(", ") : arrVal
 }
+
+
 </script>
 
 <style>

@@ -61,7 +61,7 @@
             <button id="cancel" class="btn btn-neutral" @click="selected = []">Cancel</button>
         </div>
 
-        <div v-if="keys.length">
+        <div v-if="keys && keys.length">
             <MetadataEdit :ebooks="selectedFiles" :keys="keys"/>
         </div>
 
@@ -79,7 +79,7 @@ import MetadataEdit from './MetadataEdit.vue';
 const store = useAddingListStore()
 const selected = ref([])
 const selectedFiles = ref({})
-const keys = computed(() => Object.keys(selectedFiles.value))
+const keys = computed(() => Object.keys(selectedFiles.value) || 0)
 
 const error = ref('')
 // const resReceived = ref(false)
@@ -141,7 +141,8 @@ function handleRowSelectFromLastOne(selectedI) {
 
 async function deleteBook() {
     try {
-        const res = await axios.delete('dragged', { data :{ "filepath" : selectedFiles.value } })
+
+        const res = await axios.delete('dragged', { data :{ "filepath" : Object.keys(selectedFiles.value) } })
 
         if (res.status == 200) {
             if (props.ebooks) {
