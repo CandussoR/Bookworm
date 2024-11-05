@@ -1,6 +1,8 @@
 <template>
     <div>
-        <input :id="ebookProperty" :list="ebookProperty + '-search-result'" @input="(event) => debounce(ebookProperty, event.target.value)" class="input" :name="ebookProperty" type="text" :required="required" minlength="1" maxlength="200">
+        <input :id="ebookProperty" :list="ebookProperty + '-search-result'"
+            @input="(event) => debounce(ebookProperty, event.target.value)" class="input" :name="ebookProperty"
+            type="text" :required="required" minlength="1" maxlength="200" :placeholder="placeholder">
         <datalist :id="ebookProperty + '-search-result'">
             <option v-for="(it, i) in searchResult" :key="i" :value="it"></option>
         </datalist>
@@ -12,8 +14,12 @@ import { ref, onMounted } from "vue"
 
 const timer = ref(null)
 const hasReceivedResponse = ref(false)
-const {ebookProperty, required} = defineProps({
+const {ebookProperty, placeholder, required} = defineProps({
     "ebook-property" : String,
+    "placeholder" : {
+        required : false,
+        type: String
+    },
     "required" : Boolean
 }
 )

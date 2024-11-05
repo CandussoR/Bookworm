@@ -56,10 +56,15 @@
         </table>
 
         <div id="button-row" v-if="selected.length > 0" class="flex justify-center">
-            <button id="edit" class="btn btn-neutral mr-1">Edit</button>
+            <button id="edit" class="btn btn-neutral mr-1" onclick="edit_modal.showModal()">Edit</button>
             <button id="delete" class="btn btn-neutral mr-1" @click="deleteBook">Delete</button>
             <button id="cancel" class="btn btn-neutral" @click="selected = []">Cancel</button>
         </div>
+
+        <div v-if="keys.length">
+            <MetadataEdit :ebooks="selectedFiles" :keys="keys"/>
+        </div>
+
     </div>
 
 
@@ -69,10 +74,13 @@
 import { useAddingListStore } from '@/stores/addingList';
 import { computed, onMounted, ref } from 'vue';
 import axios from '@/utils/apiRequester'
+import MetadataEdit from './MetadataEdit.vue';
 
 const store = useAddingListStore()
 const selected = ref([])
-const selectedFilesPath = ref([])
+const selectedFiles = ref({})
+const keys = computed(() => Object.keys(selectedFiles.value))
+
 const error = ref('')
 // const resReceived = ref(false)
 const props = defineProps({
@@ -81,7 +89,7 @@ const props = defineProps({
         type : Object
     }
 })
-const emit = defineEmits(['deleted'])
+const emit = defineEmits(['deleted', 'added'])
 
 const ebooks = computed(() => props.ebooks || store.addingList)
 
@@ -95,12 +103,13 @@ function handleRowSelect(i, path) {
     const arrIndex = selected.value.findIndex(el => el === i)
     if (arrIndex !== -1) {
         selected.value.splice(arrIndex, 1)
-        selectedFilesPath.value.splice(arrIndex, 1)
+        delete selectedFiles.value[path]
+        // selectedFilesPath.value.splice(arrIndex, 1)
         return
     }
 
     selected.value.push(i)
-    selectedFilesPath.value.push(path)
+    selectedFiles.value[path] = store.addingList[path]
 }
 
 function handleRowSelectFromLastOne(selectedI) {
@@ -111,41 +120,60 @@ function handleRowSelectFromLastOne(selectedI) {
 
     if (arrIndex !== -1 && arrIndex < selected.value.length - 1) {
         selected.value.splice(arrIndex +1, selected.value.length - 1 - arrIndex)
-        selectedFilesPath.value.splice(arrIndex +1, selected.value.length - 1 - arrIndex)
+        const paths = keys.slice(arrIndex,selected.value.length - 1 - arrIndex) 
+        paths.forEach((p) => delete selectedFiles.value[p])
+        // selectedFilesPath.value.splice(arrIndex +1, selected.value.length - 1 - arrIndex)
         return
     }
 
     for (let i = lastSelected ; i <= selectedI ; i++) {
         if (selected.value.includes(keys[i])) continue;
-
         selected.value.push(i);
-        selectedFilesPath.value.push(keys[i].path);
+        // selectedFilesPath.value.push(keys[i].path);
     }
+    const paths = keys.slice(arrIndex,lastSelected - selectedI) 
+    paths.forEach((p) => { 
+        if (!(p in selectedFiles.value)) {
+        selectedFiles.value[p] = store.addingList[p]
+        }
+    })
 }
 
 async function deleteBook() {
     try {
-        const res = await axios.delete('dragged', { data :{ "filepath" : selectedFilesPath.value } })
+        const res = await axios.delete('dragged', { data :{ "filepath" : selectedFiles.value } })
 
         if (res.status == 200) {
             if (props.ebooks) {
-                emit("deleted", selectedFilesPath.value)
+                emit("deleted", selectedFiles.value)
                 return
             }
 
             // Updating store if we're not in the DragDrop view, else no use
-            selectedFilesPath.value.forEach(element => {
+            selectedFiles.value.forEach(element => {
                 if (element in store.addingList) {
                     delete store.addingList[element]
                 }
             }
-
         );
 
-            selectedFilesPath.value = []
+            selectedFiles.value = []
         }
     } catch (error) {
         error.value = error
     }
+}
+
+function addBook() {
+    console.log("we dummy add book")
+    // returns empty if everything went well, else errors
+    // const res = await axios.post('ebooks', {"ebooks" : ... })
+
+    // if (res.errors) {
+    //  emit('added', selectedFilesPath.value - errors)
+    // } else {
+    // emit('added', selectedFilesPath.value)
+    // }
+
 }
 </script>
