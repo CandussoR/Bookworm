@@ -56,13 +56,13 @@
         </table>
 
         <div id="button-row" v-if="selected.length > 0" class="flex justify-center">
-            <button id="edit" class="btn btn-neutral mr-1" onclick="edit_modal.showModal()">Edit</button>
+            <button id="edit" class="btn btn-neutral mr-1" @click="loadAndLaunchModal">Edit</button>
             <button id="delete" class="btn btn-neutral mr-1" @click="deleteBook">Delete</button>
             <button id="cancel" class="btn btn-neutral" @click="selected = []">Cancel</button>
         </div>
 
-        <div v-if="keys && keys.length">
-            <MetadataEdit :ebooks="selectedFiles" :keys="keys"/>
+        <div v-if="open" >
+            <MetadataEdit :ebooks="selectedFiles" :keys="keys" @updated="(u) => changeSelectedBooksMetadata(u)" />
         </div>
 
     </div>
@@ -72,7 +72,7 @@
 
 <script setup>
 import { useAddingListStore } from '@/stores/addingList';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, useTemplateRef, nextTick } from 'vue';
 import axios from '@/utils/apiRequester'
 import MetadataEdit from './MetadataEdit.vue';
 
@@ -80,9 +80,10 @@ const store = useAddingListStore()
 const selected = ref([])
 const selectedFiles = ref({})
 const keys = computed(() => Object.keys(selectedFiles.value) || 0)
+const ebooks = computed(() => props.ebooks || store.addingList)
+const open = ref(false)
 
 const error = ref('')
-// const resReceived = ref(false)
 const props = defineProps({
     ebooks : {
         required : false,
@@ -91,13 +92,20 @@ const props = defineProps({
 })
 const emit = defineEmits(['deleted', 'added'])
 
-const ebooks = computed(() => props.ebooks || store.addingList)
 
 onMounted(async () => {
     if (!props.ebooks) {
         await store.getAddingList()
     }
 })
+
+function loadAndLaunchModal() {
+    open.value = true
+    nextTick(() => {
+        const modal = document.getElementById('edit_modal')
+        modal.showModal()
+    })
+}
 
 function handleRowSelect(i, path) {
     const arrIndex = selected.value.findIndex(el => el === i)
@@ -137,6 +145,25 @@ function handleRowSelectFromLastOne(selectedI) {
         selectedFiles.value[p] = store.addingList[p]
         }
     })
+}
+
+// Needs testing, should update books in back too I guess ?
+/**
+ * @param {Object} updates - the properties of the books that have been modified during edit, all strings
+ **/
+function changeSelectedBooksMetadata(updates) {
+    console.log(updates)
+    try {
+        const res = axios.put('dragged', updates)
+        if (res.status === 200) {
+    //         // update addingListStore
+            console.log("sucess")
+        }
+    }
+    catch(error) {
+        console.error("An error occured when you tried to modify the data of the dragged books", error)
+        // if error, should we store some kind of pending modifications somewhere ?
+    }
 }
 
 async function deleteBook() {
