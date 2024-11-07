@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import json
 import socketserver
+from typing import Optional
 from back.services.draggedService import DraggedController
 from back.services.ebookService import EbookController
 from back.services.libraryService import LibraryController
@@ -12,13 +13,15 @@ from back.services.readingsService import ReadingsController
 from operator import itemgetter
 
 NEW_LINE = "\r\n"
+BODY = b"\r\n\r\n"
 
 class MyHTTPService():
     @staticmethod
-    def get_headers(request : list[str]) -> dict:
+    def get_headers_from_bytes(request : bytes) -> dict:
+        splitted_request = request.decode().split(NEW_LINE)
         headers = {}
-        [headers["method"], headers["uri"], _] = request[0].split(" ")
-        for line in request[1:]:
+        [headers["method"], headers["uri"], _] = splitted_request[0].split(" ")
+        for line in splitted_request[1:]:
             # Distinction between the headers and body since request split on new_line
             if line == "":
                 break
@@ -26,49 +29,42 @@ class MyHTTPService():
             headers[k] = v
         return headers
 
-
     @staticmethod
-    def parse_request(request : bytes) -> dict:
-        splitted_request = request.decode().split(NEW_LINE)
-        print("REQUEST CAME IN, FIRST BUFFER", splitted_request)
-        headers = MyHTTPService.get_headers(splitted_request)
-        endpoint = headers["uri"]
+    def parse_request(headers : dict) -> str | None :
+        data = None
 
-        # Preflight, it's about sending a message
-        if headers["method"] == 'OPTIONS':
-            return {"headers" : {"method" : "OPTIONS"}, "data" : ""}
+        if headers["method"] not in ["GET", "DELETE"]:
+            return data
 
         # With query params
-        if headers["method"] in ["GET", "DELETE"] and '?' in headers["uri"]:
-            endpoint, params = headers["uri"].rsplit("?", 1)
+        if '?' in headers["uri"]:
+            params = headers["uri"].rsplit("?", 1).pop()
             if '&' in params:
                 params = params.split('&')
                 data = [p.split('=') for p in params]
             else:
                 data = params.split('=')
             # Cleans query params
+            # TODO : remember why this is only in a matrix and not a dict
             data = [d.replace('+', ' ') for d in data]
-            # Gets the uri without its params
-            headers["uri"] = endpoint
 
         # Without query params, 
         # /api/sth -> two slashes, if we need one more, up until now it's a guid
-        elif headers["method"] in ["GET", "DELETE"] and headers["uri"].count('/') > 2: 
+        if headers["uri"].count('/') > 2: 
             # TODO : Correct this if we ever use and endpoint with more then 3 slashes
-            headers["uri"],*data = headers["uri"].rsplit("/", 1)
+            data = headers["uri"].rsplit("/", 1).pop()
 
-        # We only get a request without data if it's a get, so we can check it at this point
-        elif headers["method"] == "GET":
-            data = None
+        return data
 
-        else:
-            # If we came this far, the request MUST have a body.
-            # This has to break and does so with Value Error.
-            separator = splitted_request.index('')
-            data = "\r\n".join(splitted_request[separator+1:])
+
+    @staticmethod
+    def parse_uri(uri : str) -> str:
+        if '?' in uri:
+            return uri.rsplit("?", 1)[0]
+        elif uri.count('/') > 2:
+            return uri.rsplit("/", 1)[0]
+        return uri
         
-        return {"headers" : headers, "data" : data}
-
 
     @staticmethod
     def create_response_from(code, content_type, message):
@@ -91,7 +87,7 @@ class MyHTTPService():
             f"{NEW_LINE}",
             message,
         ]
-        return "".join(response)
+        return "".join(response).encode()
 
 
 class RouterService():
@@ -113,41 +109,53 @@ class RouterService():
             case '/api/reading_lists':
                 return ReadingListController(db, method, data)
             case '/api/dragged':
-                return DraggedController(db, method, data)
+                return DraggedController('./dragged.json', method, data)
             case _:
                 raise Exception("err... what did you want again ?")
 
-
 class MyTCPHandler(socketserver.BaseRequestHandler):
     def handle(self):
-        request = self.request.recv(1024).strip()
-        headers, data = MyHTTPService.parse_request(request).values()
+        data = None
 
-        if headers["method"] == "OPTIONS":
-            code, message = 200, data
-        else:
-            # Axios always send Content-Length with a body
-            if headers.get("Content-Length") and data:
-                while len(data) < int(headers["Content-Length"]):
-                    new_chunk = self.request.recv(1024)
-                    if not new_chunk:
-                        break
-                    data += new_chunk.decode()
-                    print(len(data), int(headers["Content-Length"]))
+        headers, body = self.request.recv(4096).split(BODY)
+        print("ENTERING REQUEST", BODY.join([headers, body]))
+        parsed_headers = MyHTTPService.get_headers_from_bytes(headers)
 
-            env = json.loads(open('back/env.json', 'r').read())
-            with sqlite_db.connect(env["database_test"]) as conn:
-                service = RouterService.call_service(
-                    headers["uri"],
-                    headers["method"],
+        if parsed_headers["method"] == "OPTIONS":
+            http_response = MyHTTPService.create_response_from(200, "application/json", str(''))
+            self.request.sendall(http_response)
+            return
+
+        # Axios always send Content-Length with a body
+        if body and parsed_headers.get("Content-Length"):
+            while len(body) < int(parsed_headers["Content-Length"]):
+                new_chunk = self.request.recv(4096)
+                if not new_chunk:
+                    break
+                body += new_chunk
+
+        # If data not in body but in request (params)
+        # No slug in this app for now so no worries about data both in uri and body
+        elif not body:
+            if parsed_headers["method"] in ["POST", "PUT"]:
+                raise Exception("POST or PUT MUST have a body.")
+            data = MyHTTPService.parse_request(parsed_headers)
+
+        # Ensuring we forward the good uri
+        parsed_headers["uri"] = MyHTTPService.parse_uri(parsed_headers["uri"])
+
+        env = json.loads(open('back/env.json', 'r').read())
+        with sqlite_db.connect(env["database_test"]) as conn:
+            service = RouterService.call_service(
+                    parsed_headers["uri"],
+                    parsed_headers["method"],
                     conn,
-                    data
+                    data if data else body.decode()
                 )
-                # Ignoring type because all the methods have to be implemented
-                # in child classes or app should break.
-                code, message = service.do() #type: ignore
-                print("code", code, "\nmessage", message)
-        http_response = MyHTTPService.create_response_from(code, "application/json", str(message))
-        encoded_response = http_response.encode()
-        print("encoded response\n", encoded_response)
-        self.request.sendall(encoded_response)
+            # Ignoring type because all the methods have to be implemented
+            # in child classes or app should break.
+            code, message = service.do() #type: ignore
+            print("code", code, "\nmessage", message)
+            http_response = MyHTTPService.create_response_from(code, "application/json", str(message))
+            print("sending this response", http_response)
+            self.request.sendall(http_response)
