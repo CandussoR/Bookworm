@@ -1,5 +1,6 @@
 import json
 import os
+import traceback
 from typing import Literal
 import pypdf
 import ebookmeta
@@ -12,7 +13,7 @@ class DraggedService():
     ) -> dict:
         '''Creates or adds to the dragged elements file and return what has been
         added in order to add those elements in the front.'''
-        
+
         print("ENTER INIT OR ADD", flag, filepaths)
         data = {}
         added = {}
@@ -23,12 +24,10 @@ class DraggedService():
 
         self.enrich_data(filepaths, data, added)
 
-
         with open(json_path, 'w', encoding="utf-8") as fw:
             json.dump(data, fw, indent = 4, separators=(',', ': '))
 
         return added
-
 
     def enrich_data(self, filepaths, data, added) :
         '''This mutates the data to insert in the dragged file and the added list.'''
@@ -47,54 +46,67 @@ class DraggedService():
 
             data[f] = added[f] = metadata
 
-
     def update_json_file(
-        self, json_path: str, book_path: str, updated_book_metadata: dict
-    ):
+        self, json_path: str, book_path: str|list[str], updated_book_metadata: dict
+    ) -> dict:
+        updated = {}
+
         with open(json_path, 'r', encoding="utf-8") as fr:
             data_json = json.loads(fr.read())
 
-        assert book_path in data_json, f"Error in update_json_file (Dragged Service line 39) : {book_path} is not a key."
+        if isinstance(book_path, list):
+            for b in book_path:
+                assert b in data_json, f"Error in update_json_file (Dragged Service line 39) : {b} is not a key."
+                data_json[b] = data_json[b] | updated_book_metadata
+                updated[b] = data_json[b]
+        else:
+            assert book_path in data_json, f"Error in update_json_file (Dragged Service line 39) : {book_path} is not a key."
+            data_json[book_path] = updated_book_metadata
+            updated[book_path] = data_json[book_path]
 
-        data_json[book_path] = updated_book_metadata
         with open(json_path, 'w', encoding="utf-8") as fw:
             json.dump(data_json, fw, indent=4, separators=(',', ': '))
-
+        
+        return updated
 
     def _get_file_metadata(self, filepath : str):
         _, ext = os.path.splitext(filepath)
         if ext not in ['.pdf', '.epub']:
             raise TypeError(f"File is not supported (only pdf and epub) : {ext}")
 
+        md = {
+            "title": "",
+            "author": [],
+            "publisher": "",
+            "year_of_publication": "",
+            "theme": [],
+            "genre": [],
+        }
+
         if ext == '.pdf':
             with open(filepath, 'rb') as fr:
                 reader = pypdf.PdfReader(fr)
                 metadata = self._convert_pdf_metadata(reader.metadata)
-                if not metadata:
-                    filename = os.path.basename(filepath)
-                    metadata["title"] = filename
-                if not "theme" in metadata :
-                    metadata["theme"] = []
-                if not "genre" in metadata :
-                    metadata["genre"] = []
 
         elif ext == '.epub':
             epub = ebookmeta.get_metadata(filepath)
             metadata = self._convert_epub_metadata(epub)
 
-
+        md = md | metadata
+        if not md["title"]:
+            md["title"] = os.path.basename(filepath)
         return metadata
+
 
     def _filter_metadata(self, metadata) -> dict:
         filtered = {}
-        
+
         for k,v in metadata.items():
             if k in ["author", "title"]:
                 filtered[k] = v
             elif k in ["publisher", "ebx_publisher"]:
                 filtered["publisher"] = v
         return filtered
-                
 
     def _convert_pdf_metadata(self, metadata):
         m = dict()
@@ -105,8 +117,9 @@ class DraggedService():
                 m[k] = v.split(',') if ',' in v else [v]
                 continue
             m[k] = v
+        if not "author" in m:
+            m["author"] = []
         return m
-
 
     def _convert_epub_metadata(self, metadata) -> dict:
         m = dict()
@@ -121,8 +134,8 @@ class DraggedService():
 
 
 class DraggedController(LibraryController):
-    def __init__(self, _, method, data):
-        self.file = './dragged.json'
+    def __init__(self, filepath, method, data):
+        self.file = filepath
         self.method = method
         self.data = json.loads(data) if data else {}
 
@@ -142,13 +155,14 @@ class DraggedController(LibraryController):
             assert(os.path.isfile(self.file))
             return 200, json.dumps(added)
         except Exception as e:
+            print(traceback.format_exc())
             return 500, 'Error during the writing of the json file : ' + str(e)
 
     def do_PUT(self):
         assert(len(self.data.keys()) == 2 and 'filepath' in self.data and 'metadata' in self.data) 
         try:
-            DraggedService().update_json_file(self.file, self.data["filepath"], self.data["metadata"])
-            return 200, ''
+            updated = DraggedService().update_json_file(self.file, self.data["filepath"], self.data["metadata"])
+            return 200, json.dumps(updated)
         except Exception as e:
             return 500, 'Error during the update of the json file : ' + str(e)
 
@@ -168,6 +182,7 @@ class DraggedController(LibraryController):
                 del data_json[f]
 
         with open(self.file, 'w', encoding="utf-8") as fw:
-            json.dump(data_json, fw, indent=4, separators=(',', ': '))
+            # json.dump(data_json, fw, indent=4, separators=(',', ': '))
+            json.dump(data_json, fw)
 
         return 200, 'Successfully deleted.'

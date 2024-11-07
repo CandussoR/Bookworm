@@ -90,7 +90,7 @@ const props = defineProps({
         type : Object
     }
 })
-const emit = defineEmits(['deleted', 'added'])
+const emit = defineEmits(['deleted', 'added', 'updated'])
 
 
 onMounted(async () => {
@@ -152,12 +152,15 @@ function handleRowSelectFromLastOne(selectedI) {
  * @param {Object} updates - the properties of the books that have been modified during edit, all strings
  **/
 function changeSelectedBooksMetadata(updates) {
-    console.log(updates)
     try {
         const res = axios.put('dragged', updates)
         if (res.status === 200) {
-    //         // update addingListStore
-            console.log("sucess")
+            emit('updated', res.data);
+            props.ebooks = store.addingList;
+            nextTick(() => {
+                const modal = document.getElementById('edit_modal');
+                modal.close();
+            })
         }
     }
     catch(error) {

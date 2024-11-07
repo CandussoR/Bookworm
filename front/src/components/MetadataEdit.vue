@@ -32,7 +32,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { ref, onMounted } from 'vue';
 import SearchFormInput from './SearchFormInput.vue'
 
 const emit = defineEmits(['updated']);
@@ -48,19 +48,22 @@ const props = defineProps({
     }
 })
 
-// Needs testing
-// Those are not reactive, so they can make for a quick comparison with input
-// to determine if the input is dirty or not.
-const authorPlaceholder = computed(() => getArrayValue('author'))
-const titlePlaceholder = computed(() => getValue('title'))
-const yearOfPublicationPlaceholder = computed(() => getNumericValue('year_of_publication'))
-const publisherPlaceholder = computed(() => getValue('publisher'))
-const genrePlaceholder = computed(() => getArrayValue('genre'))
-const themePlaceholder = computed(() => getArrayValue('theme'))
+const authorPlaceholder = ref(null)
+const titlePlaceholder = ref(null)
+const yearOfPublicationPlaceholder = ref(null)
+const publisherPlaceholder = ref(null)
+const genrePlaceholder = ref(null)
+const themePlaceholder = ref(null)
 
-console.table([authorPlaceholder, titlePlaceholder, yearOfPublicationPlaceholder, publisherPlaceholder, genrePlaceholder, themePlaceholder])
+onMounted(() => {
+    authorPlaceholder.value = getArrayValue('author')
+    titlePlaceholder.value = getValue('title')
+    yearOfPublicationPlaceholder.value = getNumericValue('year_of_publication')
+    publisherPlaceholder.value = getValue('publisher')
+    genrePlaceholder.value = getArrayValue('genre')
+    themePlaceholder.value = getArrayValue('theme')
+})
 
-// Needs Testing
 /**
  * The submit function only takes into account fields that have been changed,
  * but lets the parent component, EditableMetadataTable, take care of actually
@@ -85,6 +88,7 @@ function submit(event) {
 
     for (const f in mapping) {
         const field = elements.namedItem(f).value
+        console.log(f, field, mapping[f].value, field && field !== mapping[f].value)
         if (field && field !== mapping[f].value) {
             if (["author", "genre", "theme"].includes(f)) {
                 updates["metadata"][f] = [field]
@@ -100,15 +104,16 @@ function submit(event) {
 }
 
 function getValue(ppty) {
-    if (props.keys.length === 1)
+    if (props.keys.length === 1) {
         return ppty in props.ebooks[props.keys[0]] ? props.ebooks[props.keys[0]][ppty] : ''
+    }
 
     let returnValue = null
 
     for (let i = 0; i < props.keys.length; i++) {
         const k = props.keys[i]
         const isProp = ppty in props.ebooks[k]
-
+        
         if (isProp) {
             if (returnValue === null) {
                 returnValue = props.ebooks[k][ppty]
@@ -137,39 +142,39 @@ function getValue(ppty) {
  *
  **/
 function getArrayValue(ppty) {
-    console.log(props.keys.length === 1)
     if (props.keys.length === 1) {
-        try {
-            return ppty in props.ebooks[props.keys[0]] ? props.ebooks[props.keys[0]][ppty].join(', ') : ''
-        } catch (error) {
-            console.warn(
-                'Erreur au chargement du tableau',
-                ppty,
-                props.ebooks[props.keys[0]],
-                props.keys,
-                props.ebooks[props.keys[0]],
-                props.ebooks[props.keys[0]][ppty]
-            )
-            return
-        }
+        return ppty in props.ebooks[props.keys[0]] ? props.ebooks[props.keys[0]][ppty].join(', ') : ''
     }
 
-    let arrVal = []
+    let arrVal = null
     for (let i = 0; i < props.keys.length; i++) {
         const k = props.keys[i]
-        if (!(ppty in props.ebooks[k])) {
-            continue
-        } else if (!arrVal.length) {
-            arrVal = props.ebooks[k][ppty]
-            continue
-        } else if (props.ebooks[k][ppty].length !== arrVal.length) {
-            return 'Various'
+        const isProp = ppty in props.ebooks[k]
+
+        if (isProp) {
+            console.assert(typeof props.ebooks[k][ppty] === 'object', "La propriété n'est pas un tableau", props.ebooks[k][ppty])
+            if (arrVal === null) {
+                arrVal = props.ebooks[k][ppty]
+                continue
+            }
+            if (arrVal.length !== props.ebooks[k][ppty].length) {
+                return "Various"
+            }
+            // arrVal has been set as array and is the same length, so we check if its items are identical
+            for (let j = 0; j < props.ebooks[k][ppty].length; j++) {
+                if (props.ebooks[k][ppty][j] !== arrVal[j]) {
+                    return 'Various'
+                }
+            }
+            continue;
         }
 
-        for (let j = 0; j < props.ebooks[k][ppty].length; j++) {
-            if (props.ebooks[k][ppty][j] !== arrVal[j]) {
-                return 'Various'
-            }
+        // !isProp
+        if (arrVal && typeof arrVal === 'object' && arrVal.length) {
+            return "Various"
+        }
+        if (arrVal === null) {
+            arrVal = []
         }
     }
     return typeof arrVal === 'object' ? arrVal.join(', ') : arrVal
