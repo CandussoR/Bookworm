@@ -16,9 +16,13 @@
 
             <tbody>
                 <tr v-for="(e, path, i) in ebooks" :key="i" 
+                    :tabindex="i"
                     @click.exact="handleRowSelect(i, path)"
-                    @click.shift="handleRowSelectFromLastOne(i)"
-                    @click.ctrl="handleRowSelect(i,path)"
+                    @click.shift.exact="handleRowSelectFromLastOne(i)"
+                    @click.ctrl.exact="handleRowSelect(i,path)"
+                    @click.ctrl.shift="handleRowAdding(i,path)"
+                    @keydown.shift="handleShift('down')"
+                    @keyup.shift="handleShift('up')"
                     :class="[selected.includes(i) ? '!bg-calm-green text-primary-content' : '']">
                     <td dir="rtl"
                         class="whitespace-nowrap overflow-hidden text-ellipsis lg:max-w-[250px] max-w-[150px]">{{ path
@@ -72,18 +76,10 @@
 
 <script setup>
 import { useAddingListStore } from '@/stores/addingList';
-import { computed, onMounted, ref, useTemplateRef, nextTick } from 'vue';
+import { computed, onMounted, ref, watch, nextTick } from 'vue';
 import axios from '@/utils/apiRequester'
 import MetadataEdit from './MetadataEdit.vue';
 
-const store = useAddingListStore()
-const selected = ref([])
-const selectedFiles = ref({})
-const keys = computed(() => Object.keys(selectedFiles.value) || 0)
-const ebooks = computed(() => props.ebooks || store.addingList)
-const open = ref(false)
-
-const error = ref('')
 const props = defineProps({
     ebooks : {
         required : false,
@@ -91,14 +87,50 @@ const props = defineProps({
     }
 })
 const emit = defineEmits(['deleted', 'added', 'updated'])
-
+const store = useAddingListStore()
+// used to keep track of the index of selected files
+const selected = ref([])
+// used to keep track of the index when multiple click with shift
+const lastSelectAtShift = ref(null)
+// things sended to MetadataEdit
+const selectedFiles = ref({})
+const keys = computed(() => Object.keys(selectedFiles.value) || 0)
+// books loaded in the table
+const ebooks = computed(() => props.ebooks || store.addingList)
+// controlling the opening of the modal
+const open = ref(false)
 
 onMounted(async () => {
+    // just ensuring store.addingList is fed
     if (!props.ebooks) {
         await store.getAddingList()
     }
 })
 
+watch(lastSelectAtShift, (nv) => {
+    if (nv === null) {
+        console.log("shift key up, nullifying")
+    } else {
+        console.log("shift key down, last selected", nv)
+    }
+},
+    {deep : true}
+)
+
+function handleShift(upOrDown) {
+    console.log(upOrDown, lastSelectAtShift.value)
+    if (upOrDown === "up" && lastSelectAtShift.value) {
+        lastSelectAtShift.value = null;
+        return;
+    }
+    if (upOrDown === "down" && ! lastSelectAtShift.value) {
+        lastSelectAtShift.value = selected.value[selected.value.length - 1];
+    }
+}
+
+/**
+ * Controls the loading of MetadataEdit component and opens modal at DOM change
+ **/
 function loadAndLaunchModal() {
     open.value = true
     nextTick(() => {
@@ -107,57 +139,67 @@ function loadAndLaunchModal() {
     })
 }
 
+/**
+ * Handles the addition of a row to selected and selectedFiles
+ * @param {Number} i - index of the row clicked
+ * @param {String} path - path of the file displayed in row
+ **/
 function handleRowSelect(i, path) {
     const arrIndex = selected.value.findIndex(el => el === i)
     if (arrIndex !== -1) {
         selected.value.splice(arrIndex, 1)
         delete selectedFiles.value[path]
-        // selectedFilesPath.value.splice(arrIndex, 1)
         return
     }
-
     selected.value.push(i)
     selectedFiles.value[path] = store.addingList[path]
 }
 
+/**
+ * Fired at shift+clic
+ * @params {Number} selectedI - index of the row clicked
+ **/
 function handleRowSelectFromLastOne(selectedI) {
-    let keys = props.ebooks ? Object.keys(props.ebooks) : Object.keys(store.addingList);
-    
-    const arrIndex = selected.value.findIndex(el => el === selectedI)
-    const lastSelected = selected.value.length ? selected.value[selected.value.length - 1] : 0;
+    // unselecting everything but the last selected
+    selected.value = [ lastSelectAtShift.value || selected.value[selected.value.length - 1] ]
+    let [bookPath, bookMeta] = Object.entries(ebooks.value)[selected.value[0]]
+    selectedFiles.value = { [bookPath] : bookMeta }
 
-    if (arrIndex !== -1 && arrIndex < selected.value.length - 1) {
-        selected.value.splice(arrIndex +1, selected.value.length - 1 - arrIndex)
-        const paths = keys.slice(arrIndex,selected.value.length - 1 - arrIndex) 
-        paths.forEach((p) => delete selectedFiles.value[p])
-        // selectedFilesPath.value.splice(arrIndex +1, selected.value.length - 1 - arrIndex)
+    // Determining the order of iteration
+    const lastSelectedGreater = selected.value[0] > selectedI;
+    const ebooksEntriesSlice = lastSelectedGreater ? Object.entries(ebooks.value).slice(selectedI, selected.value[0] + 1) : Object.entries(ebooks.value).slice(selected.value[0], selectedI + 1) 
+    
+    if (lastSelectedGreater) {
+        for (let i = selected.value[0] - 1 ; i >= selectedI ; i --) {
+            selected.value.push(i);
+        }
+        ebooksEntriesSlice.forEach((path, meta) => {
+            selectedFiles.value[path] = meta;
+        })
         return
     }
 
-    for (let i = lastSelected ; i <= selectedI ; i++) {
-        if (selected.value.includes(keys[i])) continue;
+    const ebooksEntriesSliceSorted = lastSelectedGreater ? ebooksEntriesSlice : ebooksEntriesSlice.toReversed()
+    for (let i = selected.value[0] + 1; i <= selectedI; i++) {
         selected.value.push(i);
-        // selectedFilesPath.value.push(keys[i].path);
     }
-    const paths = keys.slice(arrIndex,lastSelected - selectedI) 
-    paths.forEach((p) => { 
-        if (!(p in selectedFiles.value)) {
-        selectedFiles.value[p] = store.addingList[p]
-        }
+    ebooksEntriesSliceSorted.forEach(([path, meta]) => {
+        selectedFiles.value[path] = meta;
     })
 }
 
-// Needs testing, should update books in back too I guess ?
 /**
  * @param {Object} updates - the properties of the books that have been modified during edit, all strings
  **/
-function changeSelectedBooksMetadata(updates) {
+async function changeSelectedBooksMetadata(updates) {
     try {
         const res = axios.put('dragged', updates)
+        console.log("received res", res)
         if (res.status === 200) {
+            console.log("I'm changeSelectedBooksMetadata and I received my response", res.data)
+            console.log("Emitting updated to the View now")
             emit('updated', res.data);
-            props.ebooks = store.addingList;
-            nextTick(() => {
+            await nextTick(() => {
                 const modal = document.getElementById('edit_modal');
                 modal.close();
             })
