@@ -48,6 +48,7 @@ const props = defineProps({
     }
 })
 
+console.log("MetadataEdit props.ebooks", props.ebooks, props.keys)
 const authorPlaceholder = ref(null)
 const titlePlaceholder = ref(null)
 const yearOfPublicationPlaceholder = ref(null)
@@ -71,6 +72,7 @@ onMounted(() => {
  * @params {Event} event : the form submitted on click
  **/
 function submit(event) {
+    console.log("MetadataEdit submitted for those", props.keys)
     const elements = event.target.elements
     const mapping = {
         "title": titlePlaceholder,

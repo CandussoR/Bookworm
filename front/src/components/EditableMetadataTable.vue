@@ -21,8 +21,8 @@
                     @click.shift.exact="handleRowSelectFromLastOne(i)"
                     @click.ctrl.exact="handleRowSelect(i,path)"
                     @click.ctrl.shift="handleRowAdding(i,path)"
-                    @keydown.shift="handleShift('down')"
-                    @keyup.shift="handleShift('up')"
+                    @keydown.shift="lastSelectAtShift ?? handleShift('down')"
+                    @keyup.shift="!lastSelectAtShift ?? handleShift('up')"
                     :class="[selected.includes(i) ? '!bg-calm-green text-primary-content' : '']">
                     <td dir="rtl"
                         class="whitespace-nowrap overflow-hidden text-ellipsis lg:max-w-[250px] max-w-[150px]">{{ path
@@ -107,18 +107,7 @@ onMounted(async () => {
     }
 })
 
-watch(lastSelectAtShift, (nv) => {
-    if (nv === null) {
-        console.log("shift key up, nullifying")
-    } else {
-        console.log("shift key down, last selected", nv)
-    }
-},
-    {deep : true}
-)
-
 function handleShift(upOrDown) {
-    console.log(upOrDown, lastSelectAtShift.value)
     if (upOrDown === "up" && lastSelectAtShift.value) {
         lastSelectAtShift.value = null;
         return;
@@ -193,11 +182,8 @@ function handleRowSelectFromLastOne(selectedI) {
  **/
 async function changeSelectedBooksMetadata(updates) {
     try {
-        const res = axios.put('dragged', updates)
-        console.log("received res", res)
+        const res = await axios.put('dragged', updates)
         if (res.status === 200) {
-            console.log("I'm changeSelectedBooksMetadata and I received my response", res.data)
-            console.log("Emitting updated to the View now")
             emit('updated', res.data);
             await nextTick(() => {
                 const modal = document.getElementById('edit_modal');
