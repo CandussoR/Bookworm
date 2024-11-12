@@ -1,23 +1,23 @@
 <template>
   <div>
     <input :ref="ebookProperty + 'ref'" :id="ebookProperty" :list="ebookProperty + '-search-result'"
-      @input="(event) => debounce(ebookProperty, event.target.value)" @keydown.space="addChip()" class="input"
-      :name="ebookProperty" type="text" :required="required" minlength="1" maxlength="200" :placeholder="placeholder" />
+      @input="(event) => debounce(ebookProperty, event.target.value)" @keydown.enter="addChip()" class="input"
+      :name="ebookProperty" type="text" :required="required" minlength="1" maxlength="200" :placeholder="computedPlaceholder" />
     <datalist :id="ebookProperty + '-search-result'">
       <option v-for="(it, i) in searchResult" :key="i" :value="it"></option>
     </datalist>
     <div>
       <div class="indicator" v-for="(chip, i) in chips" :key="i">
         <span class="indicator-item badge badge-primary"><img class="cursor-pointer" src="@/assets/delete.svg"
-            alt="Delete" @click="console.log('clicked', i, chip)" /></span>
-        <div class="bg-base-300 grid h-32 w-32 place-items-center">{{ chip }}</div>
+            alt="Delete" @click="deleteChip(i, chip)" /></span>
+        <div class="bg-base-300 grid h-fit w-fit p-3 rounded place-items-center">{{ chip }}</div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, useTemplateRef, watch} from 'vue'
+import { computed, ref, useTemplateRef, watch} from 'vue'
 
 const { ebookProperty, placeholder, required } = defineProps({
   'ebook-property': String,
@@ -27,6 +27,8 @@ const { ebookProperty, placeholder, required } = defineProps({
   },
   'required': Boolean
 })
+const computedPlaceholder = computed(() => placeholder && placeholder !== "Various" ? '' : placeholder)
+const emit = defineEmits(['updated'])
 const timer = ref(null)
 const hasReceivedResponse = ref(false)
 const searchResult = ref([])
@@ -43,9 +45,10 @@ function getInitialChip() {
 }
 
 function addChip() {
-  if (inputRef.value.value && inputRef.value.value !== ' ') {
-    chips.value.push(inputRef.value.value.split(' ')[0])
+  if (inputRef.value.value ) {
+    chips.value.push(inputRef.value.value)
     inputRef.value.value = null
+    emit("updated", ebookProperty, chips.value)
   }
 }
 
@@ -68,6 +71,11 @@ function debounce(key, val) {
   }
   // searchForBooks only gets called when user stops typing for 500ms
   timer.value = setTimeout(() => searchFor(key, val), 500)
+}
+
+function deleteChip(i, chip) {
+  chips.value.splice(i, 1)
+  emit("updated", ebookProperty, chips.value)
 }
 
 function searchFor(k, v) {

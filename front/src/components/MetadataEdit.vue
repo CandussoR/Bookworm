@@ -7,7 +7,7 @@
                 <SearchFormInput ebook-property="title" :placeholder="titlePlaceholder" autofocus />
 
                 <label id="author">Author</label>
-                <SearchFormInput ebook-property="author" :placeholder="authorPlaceholder" />
+                <SearchFormInputWithChips ebook-property="author" :placeholder="authorPlaceholder" @updated="(k,v) => updateCommonChips(k, v)"/>
 
                 <label id="publisher">Publisher</label>
                 <SearchFormInput ebook-property="publisher" :placeholder="publisherPlaceholder" />
@@ -17,10 +17,10 @@
                     :placeholder="yearOfPublicationPlaceholder" />
 
                 <label id="theme">Themes</label>
-                <SearchFormInput ebook-property="theme" :placeholder="themePlaceholder" />
+                <SearchFormInputWithChips ebook-property="theme" :placeholder="themePlaceholder" @updated="(k,v) => updateCommonChips(k, v)"/>
 
                 <label id="genre">Genres</label>
-                <SearchFormInput ebook-property="genre" :placeholder="genrePlaceholder" />
+                <SearchFormInputWithChips ebook-property="genre" :placeholder="genrePlaceholder" @updated="(k,v) => updateCommonChips(k, v)" />
 
                 <button class="my-4 btn btn-outline btn-neutral" type="submit">Done</button>
                 <button class="my-4 btn btn-outline btn-neutral" type="button" onclick="edit_modal.close()">
@@ -34,6 +34,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import SearchFormInput from './SearchFormInput.vue'
+import SearchFormInputWithChips from './SearchFormInputWithChips.vue';
 
 const emit = defineEmits(['updated']);
 
@@ -48,7 +49,6 @@ const props = defineProps({
     }
 })
 
-console.log("MetadataEdit props.ebooks", props.ebooks, props.keys)
 const authorPlaceholder = ref(null)
 const titlePlaceholder = ref(null)
 const yearOfPublicationPlaceholder = ref(null)
@@ -64,6 +64,11 @@ onMounted(() => {
     genrePlaceholder.value = getArrayValue('genre')
     themePlaceholder.value = getArrayValue('theme')
 })
+const chips = ref({
+    "author" : [],
+    "theme" : [],
+    "genre" : []
+})
 
 /**
  * The submit function only takes into account fields that have been changed,
@@ -73,6 +78,7 @@ onMounted(() => {
  **/
 function submit(event) {
     console.log("MetadataEdit submitted for those", props.keys)
+    console.log("These are the chips", chips.value)
     const elements = event.target.elements
     const mapping = {
         "title": titlePlaceholder,
@@ -91,17 +97,20 @@ function submit(event) {
     for (const f in mapping) {
         const field = elements.namedItem(f).value
         console.log(f, field, mapping[f].value, field && field !== mapping[f].value)
-        if (field && field !== mapping[f].value) {
-            if (["author", "genre", "theme"].includes(f)) {
-                updates["metadata"][f] = [field]
-            } else if (["title", "publisher"].includes(f)) {
+        if (field && field !== mapping[f].value && !["author", "genre", "theme"].includes(f)) {
+            if (["title", "publisher"].includes(f)) {
                 updates["metadata"][f] = field
             } else if (f === "year_of_publication") {
                 updates["metadata"][f] = parseInt(field, 10)
             }
+            continue;
+        }
+        if (["author", "genre", "theme"].includes(f) && chips.value[f].length) {
+            updates["metadata"][f] = chips.value[f]
         }
     }
 
+    console.warn("UPDATES", updates)
     emit('updated', updates)
 }
 
@@ -151,6 +160,7 @@ function getArrayValue(ppty) {
     let arrVal = null
     for (let i = 0; i < props.keys.length; i++) {
         const k = props.keys[i]
+        const book = props.ebooks[k]
         const isProp = ppty in props.ebooks[k]
 
         if (isProp) {
@@ -209,6 +219,12 @@ function getNumericValue(ppty) {
     }
 
     return yOp
+}
+
+function updateCommonChips(key, val) {
+    console.log("received key", key, "and value", val)
+    chips.value[key] = val;
+    console.log("chips are now", chips.value)
 }
 </script>
 
