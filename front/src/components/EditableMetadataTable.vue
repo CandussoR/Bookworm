@@ -162,7 +162,7 @@ function handleRowSelectFromLastOne(selectedI) {
         for (let i = selected.value[0] - 1 ; i >= selectedI ; i --) {
             selected.value.push(i);
         }
-        ebooksEntriesSlice.forEach((path, meta) => {
+        ebooksEntriesSlice.forEach(([path, meta]) => {
             selectedFiles.value[path] = meta;
         })
         return
