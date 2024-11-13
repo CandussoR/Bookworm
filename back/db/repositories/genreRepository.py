@@ -7,6 +7,10 @@ class GenreRepository():
         return self.conn.execute('SELECT genre, genre_guid FROM genres;').fetchall()
 
 
+    def search(self, data):
+        return self.conn.execute('''SELECT genre FROM genres WHERE genre LIKE ?;''', [f"%{data}%"]).fetchall()
+    
+
     def get(self, id):
         return self.conn.execute('''SELECT genre, genre_guid FROM genres WHERE genre_id = ?''', (id,)).fetchone()
     

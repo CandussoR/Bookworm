@@ -8,6 +8,11 @@ class ThemeRepository():
         return self.conn.execute('SELECT theme, theme_guid FROM themes;').fetchall()
     
 
+    def search(self, data):
+        q = '''SELECT theme FROM themes WHERE theme LIKE ?;'''
+        return self.conn.execute(q, [f"%{data}%"]).fetchall()
+
+
     def get(self, id):
         return self.conn.execute('SELECT theme, theme_guid FROM themes WHERE theme = ?', (id,)).fetchone()
     

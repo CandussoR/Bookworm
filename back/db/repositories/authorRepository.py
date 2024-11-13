@@ -29,6 +29,11 @@ class AuthorRepository():
     def get_author_by_name(self, name):
         q = '''SELECT full_name, birth_year, death_year, c.country FROM authors JOIN countries c ON c.country_id = authors.country_id WHERE full_name LIKE '%?';'''
         return self.db.execute(q, name).fetchone()
+    
+
+    def search(self, data):
+        q = '''SELECT full_name FROM authors WHERE full_name LIKE ?;'''
+        return self.db.execute(q, [f"%{data}%"]).fetchall()
 
 
     def get_author_by_country(self, country_id):

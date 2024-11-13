@@ -12,6 +12,8 @@ from back.services.readingListService import ReadingListController
 from back.services.readingsService import ReadingsController
 from operator import itemgetter
 
+from back.services.searchService import SearchController
+
 NEW_LINE = "\r\n"
 BODY = b"\r\n\r\n"
 
@@ -110,6 +112,8 @@ class RouterService():
                 return ReadingListController(db, method, data)
             case '/api/dragged':
                 return DraggedController('./dragged.json', method, data)
+            case '/api/search':
+                return SearchController(db, "GET", data)
             case _:
                 raise Exception("err... what did you want again ?")
 

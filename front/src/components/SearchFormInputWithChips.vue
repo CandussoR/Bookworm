@@ -1,23 +1,29 @@
 <template>
-  <div>
-    <input :ref="ebookProperty + 'ref'" :id="ebookProperty" :list="ebookProperty + '-search-result'"
+  <div :id="ebookProperty + '-input-with-chip'">
+
+    <input :id="ebookProperty" :ref="ebookProperty + 'ref'" :list="ebookProperty + '-search-result'"
       @input="(event) => debounce(ebookProperty, event.target.value)" @keydown.enter="addChip()" class="input"
-      :name="ebookProperty" type="text" :required="required" minlength="1" maxlength="200" :placeholder="computedPlaceholder" />
+      :name="ebookProperty" type="text" :required="required" minlength="1" maxlength="200"
+      :placeholder="computedPlaceholder" />
+
     <datalist :id="ebookProperty + '-search-result'">
       <option v-for="(it, i) in searchResult" :key="i" :value="it"></option>
     </datalist>
-    <div>
-      <div class="indicator" v-for="(chip, i) in chips" :key="i">
-        <span class="indicator-item badge badge-primary"><img class="cursor-pointer" src="@/assets/delete.svg"
-            alt="Delete" @click="deleteChip(i, chip)" /></span>
-        <div class="bg-base-300 grid h-fit w-fit p-3 rounded place-items-center">{{ chip }}</div>
+
+    <div :id="ebookProperty + '-chips'">
+      <div id="chip-container" class="indicator" v-for="(chip, i) in chips" :key="i">
+        <span id="chip-delete-badge" class="indicator-item badge badge-primary"><img class="cursor-pointer"
+            src="@/assets/delete.svg" alt="Delete" @click="deleteChip(i)" /></span>
+        <div :id="chip + '-chip'" class="bg-base-300 grid h-fit w-fit p-3 rounded place-items-center">{{ chip }}</div>
       </div>
     </div>
+
   </div>
 </template>
 
 <script setup>
-import { computed, ref, useTemplateRef, watch} from 'vue'
+import { computed, onUnmounted, ref, useTemplateRef, watch} from 'vue'
+import axios from '@/utils/apiRequester'
 
 const { ebookProperty, placeholder, required } = defineProps({
   'ebook-property': String,
@@ -36,7 +42,9 @@ const inputRef = useTemplateRef(ebookProperty + "ref")
 const chips = ref([])
 
 // still don't know how placeholder isn't already a value when passed, forced to do this for now
-watch(() => placeholder, () => getInitialChip())
+watch(() => placeholder, () => getInitialChip(), {once: true})
+
+onUnmounted(() => searchResult.value = null)
 
 function getInitialChip() {
   if (placeholder && placeholder !== "Various") {
@@ -70,17 +78,23 @@ function debounce(key, val) {
     return
   }
   // searchForBooks only gets called when user stops typing for 500ms
-  timer.value = setTimeout(() => searchFor(key, val), 500)
+  timer.value = setTimeout(async () => await searchFor(key, val), 500)
 }
 
-function deleteChip(i, chip) {
+function deleteChip(i) {
   chips.value.splice(i, 1)
   emit("updated", ebookProperty, chips.value)
 }
 
-function searchFor(k, v) {
-  if (v === 'test') {
-    searchResult.value = ['test', 'test2', 'test3']
+async function searchFor(k, v) {
+  console.log(k, v)
+  try {
+    const res = await axios.get('search', { params : { [k]: v } })
+    if (res.status === 200) {
+      searchResult.value = res.data
+    }
+  } catch (error) {
+    console.error(error)
   }
 }
 </script>
