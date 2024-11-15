@@ -15,15 +15,13 @@
             </thead>
 
             <tbody>
-                <tr v-for="(e, path, i) in ebooks" :key="i" 
-                    :tabindex="i"
-                    @click.exact="handleRowSelect(i, path)"
-                    @click.shift.exact="handleRowSelectFromLastOne(i)"
-                    @click.ctrl.exact="handleRowSelect(i,path)"
+                <tr v-for="(e, path, i) in ebooks" :key="i" :tabindex="i" @click.exact="handleRowSelect(i, path)"
+                    @click.shift.exact="handleRowSelectFromLastOne(i)" @click.ctrl.exact="handleRowSelect(i,path)"
                     @click.ctrl.shift="handleRowAdding(i,path)"
                     @keydown.shift="lastSelectAtShift ?? handleShift('down')"
                     @keyup.shift="!lastSelectAtShift ?? handleShift('up')"
                     :class="[selected.includes(i) ? '!bg-calm-green text-primary-content' : '']">
+
                     <td dir="rtl"
                         class="whitespace-nowrap overflow-hidden text-ellipsis lg:max-w-[250px] max-w-[150px]">{{ path
                         }}</td>
@@ -59,13 +57,28 @@
             </tbody>
         </table>
 
-        <div id="button-row" v-if="selected.length > 0" class="flex justify-center">
-            <button id="edit" class="btn btn-neutral mr-1" @click="loadAndLaunchModal">Edit</button>
-            <button id="delete" class="btn btn-neutral mr-1" @click="deleteBook">Delete</button>
-            <button id="cancel" class="btn btn-neutral" @click="selected = []">Cancel</button>
+        <!-- Buttons -->
+        <div id="button-row" class="flex justify-center">
+            <button v-if="keys.length" id="add" alt="Add" class="btn btn-primary mr-1" @click="addBook">Add</button>
+            <div id="edit-buttons" v-if="selected.length > 0">
+                <button id="edit" class="btn btn-secondary mr-1" @click="loadAndLaunchModal">Edit</button>
+                <button id="delete" class="btn btn-neutral mr-1" @click="deleteBook">Delete</button>
+                <button id="cancel" class="btn btn-neutral" @click="selected = []">Cancel</button>
+            </div>
         </div>
 
-        <div v-if="open" >
+        <!-- Errors -->
+        <details v-if="errorKeys.length" tabindex="0" class="mt-5 collapse bg-base-200 collapse-arrow">
+            <summary class="collapse-title text-xl font-medium text-error">Errors</summary>
+            <div class="collapse-content">
+                <div v-for="(e, path, i) in errors" :key="i">
+                    <p>{{path}} : {{ e }}</p>
+                </div>
+            </div>
+        </details>
+
+        <!-- Modal -->
+        <div v-if="open">
             <MetadataEdit :ebooks="selectedFiles" :keys="keys" @updated="(u) => changeSelectedBooksMetadata(u)" />
         </div>
 
@@ -99,6 +112,10 @@ const keys = computed(() => Object.keys(selectedFiles.value) || 0)
 const ebooks = computed(() => props.ebooks || store.addingList)
 // controlling the opening of the modal
 const open = ref(false)
+
+const errors = ref({})
+const errorKeys = computed(() => Object.keys(errors))
+
 
 onMounted(async () => {
     // just ensuring store.addingList is fed
@@ -223,10 +240,32 @@ async function deleteBook() {
     }
 }
 
-function addBook() {
-    console.log("we dummy add book")
+async function addBook() {
+    if (errorKeys.value) errors.value = {}
+
+    const payload = {"isDragged" : true, "isMultiple" : null, "ebooks" : null}
     // returns empty if everything went well, else errors
-    // const res = await axios.post('ebooks', {"ebooks" : ... })
+    if (selected.value.length) {
+        payload.isMultiple = selected.value.length > 1 ? true : false
+        payload.ebooks = selectedFiles.value
+    } else {
+        payload.isMultiple = Object.keys(ebooks).length > 1 ? true : false
+        payload.ebooks = ebooks
+    }
+
+    try {
+        const res = await axios.post('ebooks', payload)
+        if (res.status === 200) {
+            res.data.success.forEach((p) => delete store.addingList[p])
+            if (Object.keys(res.data.errors).length) {
+                errors.value = res.data.errors
+                console.log("some files have errors but oh well")
+            }   
+
+        }
+    } catch (error) {
+        console.log(error)
+    }
 
     // if (res.errors) {
     //  emit('added', selectedFilesPath.value - errors)
