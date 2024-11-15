@@ -49,6 +49,7 @@ class DraggedService():
     def update_json_file(
         self, json_path: str, book_path: str|list[str], updated_book_metadata: dict
     ) -> dict:
+
         updated = {}
 
         with open(json_path, 'r', encoding="utf-8") as fr:
@@ -61,13 +62,28 @@ class DraggedService():
                 updated[b] = data_json[b]
         else:
             assert book_path in data_json, f"Error in update_json_file (Dragged Service line 39) : {book_path} is not a key."
-            data_json[book_path] = updated_book_metadata
+            data_json[book_path] = data_json[book_path] | updated_book_metadata
             updated[book_path] = data_json[book_path]
 
         with open(json_path, 'w', encoding="utf-8") as fw:
             json.dump(data_json, fw, indent=4, separators=(',', ': '))
         
         return updated
+    
+
+    def delete_from_file(self, json_path : str, data : str | list[str]):
+        with open(json_path, 'r', encoding="utf-8") as fr:
+            data_json = json.loads(fr.read())
+
+        if isinstance(data, str):
+            del data_json[data]
+        elif isinstance(data, list):
+            for f in data:
+                del data_json[f]
+
+        with open(json_path, 'w', encoding="utf-8") as fw:
+            # json.dump(data_json, fw, indent=4, separators=(',', ': '))
+            json.dump(data_json, fw)
 
     def _get_file_metadata(self, filepath : str):
         _, ext = os.path.splitext(filepath)
@@ -172,17 +188,10 @@ class DraggedController(LibraryController):
             or isinstance(self.data["filepath"], list)
         )
 
-        with open(self.file, 'r', encoding="utf-8") as fr:
-            data_json = json.loads(fr.read())
+        try:
+            DraggedService().delete_from_file(self.file, self.data["filepath"])
+            return 200, 'Successfully deleted.'
+        except Exception as e:
+            return 500, str(e)
 
-        if isinstance(self.data["filepath"], str):
-            del data_json[self.data["filepath"]]
-        elif isinstance(self.data["filepath"], list):
-            for f in self.data["filepath"]:
-                del data_json[f]
 
-        with open(self.file, 'w', encoding="utf-8") as fw:
-            # json.dump(data_json, fw, indent=4, separators=(',', ': '))
-            json.dump(data_json, fw)
-
-        return 200, 'Successfully deleted.'

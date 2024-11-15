@@ -28,11 +28,12 @@ class AuthorRequest(BaseRequest):
 
 @dataclass
 class AuthorModel():
+    '''Coupled with db.'''
     full_name : str
     birth_year : int | None = None
     death_year : int | None = None
-    gender_guid : str = ''
-    country_guid : str = ''
+    gender_id : str | None = None
+    country_id : str | None = None
     author_guid : str | None = None
 
     def __post_init__(self):

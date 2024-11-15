@@ -14,7 +14,8 @@ class EbookRepository():
         '''Gets a row without join either by ebook_id or ebook_guid.'''
         if key in ["ebook_id", "ebook_guid"]:
             return self.conn.execute(
-                'SELECT title, publisher_id, year_of_publication, ebook_guid, is_deleted FROM ebooks WHERE ? = ? ;'
+                'SELECT title, publisher_id, year_of_publication, ebook_guid, is_deleted FROM ebooks WHERE ? = ? ;',
+                [key, val]
                 ).fetchone()
         else:
             raise ValueError("Key must be ebook_id or ebook_guid")
@@ -72,20 +73,34 @@ class EbookRepository():
            Returns (title, author, ebook_guid).
         '''
         sb = f'''WITH et AS (
-            FROM ebooks_themes et
-            JOIN themes t ON t.theme_id = et.theme_id
-            WHERE ebook_id = {ebook_id}
-        ),
-        ea AS (
-            SELECT ea.ebook_id, GROUP_CONCAT(a.full_name, ',') as author
-            FROM ebooks_authors ea
-            JOIN authors a ON ea.author_id = a.author_id
-            WHERE ebook_id = {ebook_id}
-        ),
-        SELECT e.title, author, e.ebook_guid
-        FROM ea
-        JOIN ebooks e ON ea.ebook_id = e.ebook_id
-        '''
+                    SELECT et.ebook_id, GROUP_CONCAT(t.theme, ', ') as theme
+                    FROM ebooks_themes et
+                    JOIN themes t ON t.theme_id = et.theme_id
+                    WHERE et.ebook_id = {ebook_id}
+                    GROUP BY ebook_id
+                ),
+                ea AS (
+                    SELECT ea.ebook_id, GROUP_CONCAT(a.full_name, ', ') as author
+                    FROM ebooks_authors ea
+                    JOIN authors a ON ea.author_id = a.author_id
+                    WHERE ea.ebook_id = {ebook_id}
+                    GROUP BY ebook_id
+                ),
+                eg AS (
+                    SELECT eg.ebook_id, GROUP_CONCAT(g.genre, ', ') as genre
+                    FROM ebooks_genres eg
+                    JOIN genres g ON g.genre_id = eg.genre_id
+                    WHERE eg.ebook_id = {ebook_id}
+                    GROUP BY ebook_id
+                )
+                SELECT e.title, author, e.year_of_publication, p.publisher, genre, theme, e.ebook_guid, e.inserted_at
+                FROM ebooks e
+                JOIN ea ON ea.ebook_id = e.ebook_id
+                JOIN publishers p ON p.publisher_id = e.publisher_id
+                LEFT JOIN et ON ea.ebook_id = et.ebook_id
+                LEFT JOIN eg ON ea.ebook_id = eg.ebook_id
+                WHERE e.is_deleted = 0 AND e.ebook_id = {ebook_id};
+              '''
         return self.conn.execute(sb).fetchone()
 
 
@@ -379,5 +394,4 @@ class EbookRepository():
                           FROM matches m
                           JOIN ebooks_authors ea ON ea.ebook_id = m.ebook_id
                           JOIN authors a ON a.author_id = ea.author_id;''').fetchall()
-        print(data, type(data), data == [(None, None, None)])
         return data if data != [(None, None, None)] else None

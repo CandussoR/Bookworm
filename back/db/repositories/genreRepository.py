@@ -27,10 +27,10 @@ class GenreRepository():
     
 
     def create(self, model):
-        return self.conn.execute('''INSERT INTO genres (genre, genre_guid) VALUES (:genre, :genre_guid) RETURNING genre_id;''', [model.__dict__]).fetchone()
+        return self.conn.execute('''INSERT INTO genres (genre, genre_guid) VALUES (:genre, :genre_guid) RETURNING genre_id;''', model.__dict__).fetchone()
 
     def update(self, model):
-        return self.conn.execute('''UPDATE TABLE genres SET genre = :genre WHERE genre_guid = :genre_guid RETURNING genre, genre_guid;;''', [model.__dict__]).fetchone()
+        return self.conn.execute('''UPDATE TABLE genres SET genre = :genre WHERE genre_guid = :genre_guid RETURNING genre, genre_guid;;''', model.__dict__).fetchone()
 
 
     def delete(self, guid):

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from functools import lru_cache
 import sqlite3
+import traceback
 from uuid import UUID, uuid4
 import json
 from back.db.repositories.authorRepository import AuthorRepository
@@ -11,9 +12,11 @@ from back.db.repositories.readings_repository import ReadingsRepository
 from back.db.repositories.themeRepository import ThemeRepository
 from back.services.authorService import AuthorModel
 from back.services.baseRequest import BaseRequest
+from back.services.draggedService import DraggedService
 from back.services.genreService import GenreModel
 from back.services.libraryService import LibraryController
 from back.db.repositories.ebookRepository import EbookRepository
+from back.services.publisherService import PublisherModel
 from back.services.themeService import ThemeModel
 
 
@@ -43,8 +46,14 @@ class EbookModel():
     title : str
     publisher_id : int 
     year_of_publication : int
-    ebook_guid : str
+    ebook_guid : str | None
     is_deleted : int = 0
+    
+
+    def __post_init__(self):
+        if not self.ebook_guid:
+            self.ebook_guid = str(uuid4())
+
     
     def new_guid(self):
         self.ebook_guid = str(uuid4())
@@ -110,7 +119,21 @@ class EbookService():
         return [EbookSearchResult(*d) for d in data] if data else []
     
 
-    def create(self, request : EbookRequest) -> EbookResource:
+    def create(self, json_data) -> dict:
+        '''Returns a list of resouces and of potential errors.'''
+        ret = { "success" : [], "errors" : {} }
+
+        for k,v in json_data.items():
+            try:
+                self._create(EbookRequest(v))
+                ret["success"].append(k)
+            except Exception as e:
+                ret["errors"][k] = str(e)
+        
+        return ret
+
+
+    def _create(self, request : EbookRequest) -> EbookResource:        
         author_repo = AuthorRepository(self.conn)
         genre_repo = GenreRepository(self.conn)
         theme_repo = ThemeRepository(self.conn)
@@ -131,7 +154,7 @@ class EbookService():
                 case "publisher":
                     # There's only one publisher every time for now
                     [publisher_id] = self._get_ids(k, PublisherRepository(self.conn), v)
-        model = EbookModel(request.title, publisher_id, request.year_of_publication, str(request.ebook_guid))
+        model = EbookModel(request.title, publisher_id, request.year_of_publication, str(uuid4()))
         ebook_id = self._create_ebook(model)
 
         cross_tables_repo.create("ebooks_authors", [(ebook_id, a) for a in authors_id])
@@ -195,7 +218,7 @@ class EbookService():
                     id, = repo.create(self._create_model(key,v))
                 else:
                     # Unpacking the tuple only now since unpacking None raises a TypeError
-                    id = id,
+                    id, = id
                 ids.append(id)
             return ids
     
@@ -217,6 +240,8 @@ class EbookService():
             return GenreModel(genre=v)
         elif key == "theme":
             return ThemeModel(theme=v)
+        elif key == "publisher":
+            return PublisherModel(publisher=v)
         else:
             raise KeyError("This key isn't possible") 
         
@@ -265,12 +290,25 @@ class EbookController(LibraryController):
 
     def do_POST(self):
         try:
+            ret = None
             data = json.loads(self.data)
-            resource = self.service.create(EbookRequest(data))
+            assert(isinstance(data, dict) and "isMultiple" in data and "ebooks" in data and "isDragged" in data)
+
+            ret = self.service.create(data["ebooks"])
+
+            if not ret["success"]:
+                return 400, json.dumps(ret)
+
+            if data["isDragged"]:
+                with open('back/env.json') as fr:
+                    env = json.loads(fr.read())
+                    dragged = env["dragged"]
+                DraggedService().delete_from_file(dragged, ret["success"]) # type: ignore
         except Exception as e:
+            traceback.format_exc()
             return 400, str(e)
         else:
-            return 200, resource
+            return 200, json.dumps(ret)
         
 
     def do_PUT(self):

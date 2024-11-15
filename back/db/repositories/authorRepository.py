@@ -46,14 +46,11 @@ class AuthorRepository():
         return self.db.execute(q, [author.birth_year, author.death_year]).fetchall()
 
 
-    def create(self, model, return_id : bool = False):
-        ret = ''
-        if return_id:
-            ret = 'RETURNING author_id'
+    def create(self, model):
         q = f'''INSERT INTO authors (full_name, birth_year, death_year, gender_id, country_id, author_guid)
-               VALUES (:full_name, :birth_year, :death_year, :gender_id, :country_id, :author_guid) {ret};''',
-        return self.db.execute(q, [model.__dict__])
-
+               VALUES (:full_name, :birth_year, :death_year, :gender_id, :country_id, :author_guid) RETURNING author_id;'''        
+        data = self.db.execute(q, model.__dict__).fetchone()
+        return data
 
     def update(self, model):
         return self.db.execute('''UPDATE TABLE authors (full_name, birth_year, death_year, gender_id, country_id, author_guid)

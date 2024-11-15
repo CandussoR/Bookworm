@@ -24,7 +24,7 @@ class ThemeModel():
     theme : str
     theme_guid : str | None = None
 
-    def __post__init(self):
+    def __post_init__(self):
         if not self.theme_guid:
             self.theme_guid = str(uuid4())
 

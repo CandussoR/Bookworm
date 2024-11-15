@@ -38,7 +38,8 @@ class GenreResource():
 
 
 class GenreController(LibraryController):
-    '''So basic we don't really need to separate the service from Controller, there's nothing here.'''
+    '''So basic we don't really need to separate the service from Controller, 
+    there's nothing here.'''
 
     def __init__(self, conn, method, uri, data):
         self.method = method
@@ -70,6 +71,7 @@ class GenreController(LibraryController):
             repo = GenreRepository(self.conn)
             if UUID(self.data):
                 id = repo.get_id_from_guid(self.data)
-                CrossTableRepository(self.conn).delete("ebooks_genres", other_id=id)
+                CrossTableRepository(self.conn).delete("ebooks_genres", 
+                                                       other_id=id)
                 repo.delete(self.data)
         return 200, "Successfully deleted."

@@ -29,11 +29,11 @@ class ThemeRepository():
     
     
     def create(self, model):
-        return self.conn.execute('''INSERT INTO themes (theme, theme_guid) VALUES :theme, :theme_guid RETURNING theme_id;''', [model.__dict__]).fetchone()
+        return self.conn.execute('''INSERT INTO themes (theme, theme_guid) VALUES (:theme, :theme_guid) RETURNING theme_id;''', model.__dict__).fetchone()
     
     
     def update(self, model):
-        return self.conn.execute('''UPDATE TABLE themes SET theme = :theme WHERE guid = :theme_guid RETURNING theme, theme_guid;''', [model.__dict__]).fetchone()
+        return self.conn.execute('''UPDATE TABLE themes SET theme = :theme WHERE guid = :theme_guid RETURNING theme, theme_guid;''', model.__dict__).fetchone()
     
     
     def delete(self, guid):
