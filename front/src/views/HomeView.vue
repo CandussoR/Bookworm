@@ -17,33 +17,97 @@
             <th>Theme</th>
           </tr>
         </thead>
-        <TableBody :ebooks="ebooks" @get-ebooks-for="(key, value) => seeBooksFor(key, value)"/>
+        <TableBody :ebooks="ebooks" 
+          @get-ebooks-for="(key, value) => seeBooksFor(key, value)"
+          @update-selection="(data) => handleSelection(data)" />
       </table>
+
+      <!-- Modal -->
+      <div v-if="open">
+      <EditDatabaseData :ebooks="selectedBooks" :keys="keys" @updated="(u) => updateBooks(u)" />
+      </div>
+
+    </div>
+
+    <!-- Buttons -->
+    <div v-if="selected.length" id="button-row" class="fixed bottom-0 left-0 w-full flex justify-center p-3 bg-base-200">
+      <div id="edit-buttons" v-if="selected.length > 0">
+        <button id="edit" class="btn btn-secondary mr-2" @click="loadAndLaunchModal">Edit</button>
+        <button id="delete" class="btn btn-neutral mr-2" @click="deleteBook">Delete</button>
+        <button id="cancel" class="btn btn-neutral" @click="selected = []">Cancel</button>
+      </div>
     </div>
   </main>
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import TableBody from '@/components/TableBody.vue';
-import { ebookStore } from '@/stores/ebooks.js';
+import { computed, ref, nextTick } from 'vue'
+import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import TableBody from '@/components/TableBody.vue'
+import EditDatabaseData from '@/components/EditDatabaseData.vue'
+import { ebookStore } from '@/stores/ebooks.js'
+import axios from '@/utils/apiRequester'
 
 const store = ebookStore()
-let ebooks = ref(null);
+let ebooks = ref(null)
 let router = useRouter()
+let selected = ref([])
+let selectedBooks = computed(() => selected.value.map((i) => ebooks.value[i]))
+const open = ref(false)
 
 onMounted(async () => {
   if (!store.ebooks) {
     await store.index()
   }
   ebooks.value = store.ebooks
-  console.log("Im homeview and ebooks are now", ebooks.value)
 })
 
 function seeBooksFor(key, value) {
   // Router sur une autre page qui affiche les ebooks liés à la clé sélectionnée.
-  router.push({ name : `ebooks`, params: {"key" : key, "value" : value} })
+  router.push({ name: `ebooks`, params: { key: key, value: value } })
+}
+
+function handleSelection(data) {
+  selected.value = data
+}
+
+// Opens the modal for potential edit
+function loadAndLaunchModal() {
+    open.value = true
+    nextTick(() => {
+        const modal = document.getElementById('edit_modal')
+        modal.showModal()
+    })
+}
+
+
+async function updateBooks(updatedData) {
+  try {
+    const res = await axios.put('ebooks', { "updates": updatedData })
+    if (res.status === 200) {
+      res.data.forEach((b) => { store.ebooks[store.ebooks.find((sE) => sE.ebook_guid === b.ebook_guid)] = b })
+      ebooks.value = store.ebooks
+      nextTick(() => {
+        const modal = document.getElementById('edit_modal')
+        modal.close()
+      })
+    }
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+async function deleteBook() {
+  try {
+    const res = await axios.delete('ebooks', { data: { "guids": [selected.value.map((i) => store.ebooks[i].guid)] } })
+    if (res.status == 200) {
+      ebooks.value = await store.index()
+    }
+  }
+  catch (error) {
+    console.error(error)
+  }
+
 }
 </script>
