@@ -40,6 +40,27 @@ class EbookRequest(BaseRequest):
             raise ValueError("Guid is not valid")
 
 
+class EbookUpdateRequest(BaseRequest):
+    def __init__(self, json_data):
+        self.ebook_guid = json_data["ebook_guid"]
+        del json_data["ebook_guid"]
+        for k,v in json_data.items():
+            self.__setattr__(k, v)
+        self.validate()
+
+    def validate(self) :
+        keys = ["ebook_guid", "title", "publisher", "year_of_publication", "author", "genre", "theme"]
+        not_in = [k for k in self.__dict__.keys() if k not in keys]
+        if not_in:
+            raise KeyError(f"These keys are not authorized : {not_in}")
+    
+    # Needed because of the dynamic setting of attributes
+    def __getattr__(self, name):
+        # Not sending error for checking in update
+        if name in self.__dict__:
+            return self.__dict__[name]
+        return None
+
 
 @dataclass
 class EbookModel():
@@ -108,19 +129,16 @@ class EbookService():
         data = self.repository.get_ebooks()
         return [EbookResource(*d) for d in data] if data else []
 
-
     def get_by(self, key, value) -> list[EbookResource]:
         data = self.repository.get_ebooks_by(key, value)
         return [EbookResource(*d) for d in data] if data else []
 
-
     def search(self, query):
         data = self.repository.search(query)
         return [EbookSearchResult(*d) for d in data] if data else []
-    
 
     def create(self, json_data) -> dict:
-        '''Returns a list of resouces and of potential errors.'''
+        '''Returns a list of resouces and potential errors.'''
         ret = { "success" : [], "errors" : {} }
 
         for k,v in json_data.items():
@@ -129,10 +147,10 @@ class EbookService():
                 ret["success"].append(k)
             except Exception as e:
                 ret["errors"][k] = str(e)
-        
+
         return ret
 
-
+    # Should probably find a better name, one day
     def _create(self, request : EbookRequest) -> EbookResource:        
         author_repo = AuthorRepository(self.conn)
         genre_repo = GenreRepository(self.conn)
@@ -163,26 +181,52 @@ class EbookService():
 
         data = self.repository.get_ebook(ebook_id)
         return EbookResource(*data)
-    
 
-    def update(self, request):
+    def update(self, request): 
+        updated_resources = []
+        for r in request:
+            updated_resources.append(self.update_a_book(EbookUpdateRequest(r)))
+        return updated_resources
+
+    def update_a_book(self, request):
         '''Handle an update request which might be only minimal with Model fields,
         or greater if other fields are modified.'''
-        ebook_id = self.repository.get_id_from_guid(request.ebook_guid)
+        ebook_id = self.repository.get_id_from_guid(str(request.ebook_guid))
 
-        for v in ["author", "theme", "genre"]:
-            if v in request:
-                repo = self._create_repo(v)
-                ids= [repo.get_id_from_guid(v) for v in request[v]]
-                self._update_cross_table(f"ebooks_{v}s", ebook_id, ids)
-        
-        model = EbookModel(request.title, request.publisher_id, request.year_of_publication, request.ebook_guid)
-        self.repository.update(model)
+        for k in ["author", "theme", "genre"]:
+            if k in request.__dict__:
+                repo = self._create_repo(k)
+                ids = self._get_ids(k, repo, request.__dict__[k])
+                self._update_cross_table(f"ebooks_{k}s", ebook_id, ids)
+
+        if request.title or request.year_of_publication or request.publisher:
+            self._update_book_row(request)
+
         data = self.repository.get_ebook(ebook_id)
         return EbookResource(*data)
-    
-    
-    def delete(self, guid):
+
+    def _update_book_row(self, request):
+        if "publisher" in request.__dict__:
+            repo = self._create_repo("publisher")
+            [id] = self._get_ids("publisher", repo, request.__dict__["publisher"])
+            request["publisher_id"] = id
+
+        model = {
+            "title": request.title,
+            "publisher_id": request.publisher_id,
+            "year_of_publication": request.year_of_publication,
+            "ebook_guid": str(request.ebook_guid),
+        }
+        self.repository.update(model)
+
+    def delete(self, guid) :
+        if isinstance(guid, list):
+            for g in guid:
+                self.delete_book(g)
+        elif (isinstance(guid, str) and UUID(guid)):
+            self.delete_book(guid)
+
+    def delete_book(self, guid):
         UUID(guid)
         ebook_id = self.repository.get_id_from_guid(guid)
 
@@ -198,7 +242,6 @@ class EbookService():
             ct_repo.delete(table, ebook_id)
         self.repository.delete(guid, wipe = True)
 
-    
     def _create_repo(self, key):
         if key == "author":
             return AuthorRepository(self.conn)
@@ -208,20 +251,19 @@ class EbookService():
             return ThemeRepository(self.conn)
         else:
             raise KeyError("This key isn't possible")
-        
 
     def _get_ids(self, key, repo, values : list[str]):
-            ids = []
-            for v in values:
-                id = repo.get_id(v)
-                if not id:
-                    id, = repo.create(self._create_model(key,v))
-                else:
-                    # Unpacking the tuple only now since unpacking None raises a TypeError
-                    id, = id
-                ids.append(id)
-            return ids
-    
+        ids = []
+        for v in values:
+            id = repo.get_id(v)
+            if not id:
+                id, = repo.create(self._create_model(key,v))
+            else:
+                # Unpacking the tuple only now since unpacking None raises a TypeError
+                id, = id
+            ids.append(id)
+        return ids
+
     def _create_ebook(self, model : EbookModel) -> int:
         while True:
             try:
@@ -231,7 +273,6 @@ class EbookService():
             except sqlite3.IntegrityError:
                 model.new_guid()
         return ebook_id
-    
 
     def _create_model(self, key, v):
         if key == "author":
@@ -244,7 +285,6 @@ class EbookService():
             return PublisherModel(publisher=v)
         else:
             raise KeyError("This key isn't possible") 
-        
 
     def _update_cross_table(self, table, ebook_id, other_ids):
         '''Ensuring that a foreign key constraint won't interfere with our plans of eradication.'''
@@ -312,8 +352,16 @@ class EbookController(LibraryController):
         
 
     def do_PUT(self):
-        resource = self.service.update(EbookRequest(self.data))
-        return 200, resource
+        '''For the sake of simplicity, always receives a list of books with updated data.'''
+        data = json.loads(self.data)
+        assert("updates" in data and isinstance(data["updates"], list))
+
+        try:
+            resources = self.service.update(data["updates"])
+        except Exception as e:
+            return 500, str(e)
+        else:
+            return 200, resources
 
 
     def do_DELETE(self):
