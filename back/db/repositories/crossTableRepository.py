@@ -5,16 +5,17 @@ class CrossTableRepository():
         "ebooks_authors": "author_id",
     }
 
-
     def __init__(self, conn):
         self.conn = conn
-
 
     def get(self, table, ebook_id = None, other_id = None) -> list[tuple]:
         if table not in self.second_column:
             raise Exception("Table doesn't exist.")
-        return self.conn.execute(f'SELECT ebook_id, {self.second_column["table"]} WHERE ebook_id = ?', [ebook_id]).fetchall()
-        
+        # using f_string because the column is a string literal in request
+        return self.conn.execute(
+            f"SELECT ebook_id, {self.second_column[table]} FROM {table} WHERE ebook_id = (?)",
+            [ebook_id],
+        ).fetchall()
 
     def create(self, table, ids : list[tuple[int, int]]):
         if table not in self.second_column:
@@ -23,7 +24,6 @@ class CrossTableRepository():
             self.conn.execute(f"""INSERT INTO { table } (ebook_id, { self.second_column[table] }) VALUES ( ?, ? );""",
                 [ebook_id, other_id],
             )
-
 
     def delete(self, table, ebook_id : int | None = None, other_id : int | None = None):
         """Will send operational error if infos doesn't match."""
@@ -35,6 +35,6 @@ class CrossTableRepository():
         elif ebook_id and not other_id:
             query, params = (f'''DELETE FROM {table} WHERE ebook_id = ?''', [ebook_id])
         else :
-            query, params = (f'''DELETE FROM {table} WHERE ebook_id = ebook_id AND {self.second_column[table]} = (?)''', [ebook_id, other_id])
+            query, params = (f'''DELETE FROM {table} WHERE ebook_id = ? AND {self.second_column[table]} = (?)''', [ebook_id, other_id])
 
         self.conn.execute(query, params)

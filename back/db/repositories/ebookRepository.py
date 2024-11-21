@@ -70,7 +70,7 @@ class EbookRepository():
 
     def get_ebook(self, ebook_id) -> tuple:
         '''We generally have to retrieve the id before making any change in the database so using the id is quite convenient.
-           Returns (title, author, ebook_guid).
+           Returns (title, author, year_of_publication, publisher, genre, theme, ebook_guid, inserted_at).
         '''
         sb = f'''WITH et AS (
                     SELECT et.ebook_id, GROUP_CONCAT(t.theme, ', ') as theme
@@ -114,9 +114,9 @@ class EbookRepository():
 
     def update(self, model):
         self.conn.execute('''UPDATE ebooks
-                            SET title = :title,
-                                year_of_publication = :year_of_publication,
-                                publisher_id = :publisher_id
+                            SET title = COALESCE(:title, title),
+                                year_of_publication = COALESCE(:year_of_publication, year_of_publication),
+                                publisher_id = COALESCE(:publisher_id, publisher_id)
                             WHERE ebook_guid = :ebook_guid;''',
                             [model.__dict__]
         )
