@@ -100,9 +100,11 @@ async function updateBooks(updatedData) {
 
 async function deleteBook() {
   try {
-    const res = await axios.delete('ebooks', { data: { "guids": [selected.value.map((i) => store.ebooks[i].guid)] } })
+    const guids = selected.value.map((i) => store.ebooks[i].ebook_guid)
+    const res = await axios.delete('ebooks', { data: { "guids": guids } })
     if (res.status == 200) {
-      ebooks.value = await store.index()
+      guids.forEach(g => store.ebooks.splice(store.ebooks.findIndex((b) => b.ebook_guid === g), 1))
+      ebooks.value = store.ebooks
     }
   }
   catch (error) {

@@ -365,8 +365,11 @@ class EbookController(LibraryController):
 
 
     def do_DELETE(self):
+        data = json.loads(self.data)
+        assert("guids" in data and len(data.keys()) == 1)
+
         try:
-            self.service.delete(self.data)
+            self.service.delete(data["guids"])
         except ValueError as e:
             return 400, str(e)
         else:
