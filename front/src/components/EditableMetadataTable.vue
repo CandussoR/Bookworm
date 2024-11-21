@@ -1,88 +1,95 @@
 <template>
+    <div>
 
-    <div id="table-container" class="w-full p-5 overflow-x-auto">
-        <table id="metadata-table" class="table table-zebra min-w-full">
-            <thead>
-                <tr>
-                    <th scop="col">Path</th>
-                    <th scop="col">Title</th>
-                    <th scop="col">Author</th>
-                    <th scop="col">Year_of_publication</th>
-                    <th scop="col">Publisher</th>
-                    <th scop="col">Genre</th>
-                    <th scop="col">Theme</th>
-                </tr>
-            </thead>
+        <div id="table-container" class="w-full p-5 overflow-x-auto pb-20">
+            <table id="metadata-table" class="table table-zebra min-w-full">
+                <thead>
+                    <tr>
+                        <th scop="col">Path</th>
+                        <th scop="col">Title</th>
+                        <th scop="col">Author</th>
+                        <th scop="col">Year_of_publication</th>
+                        <th scop="col">Publisher</th>
+                        <th scop="col">Genre</th>
+                        <th scop="col">Theme</th>
+                    </tr>
+                </thead>
 
-            <tbody>
-                <tr v-for="(e, path, i) in ebooks" :key="i" :tabindex="i" @click.exact="handleRowSelect(i, path)"
-                    @click.shift.exact="handleRowSelectFromLastOne(i)" @click.ctrl.exact="handleRowSelect(i,path)"
-                    @click.ctrl.shift="handleRowAdding(i,path)"
-                    @keydown.shift="lastSelectAtShift ?? handleShift('down')"
-                    @keyup.shift="!lastSelectAtShift ?? handleShift('up')"
-                    :class="[selected.includes(i) ? '!bg-calm-green text-primary-content' : '']">
+                <tbody>
+                    <tr v-for="(e, path, i) in ebooks" :key="i" :tabindex="i" @click.exact="handleRowSelect(i, path)"
+                        @click.shift.exact="handleRowSelectFromLastOne(i)" @click.ctrl.exact="handleRowSelect(i,path)"
+                        @click.ctrl.shift="handleRowAdding(i,path)"
+                        @keydown.shift="lastSelectAtShift ?? handleShift('down')"
+                        @keyup.shift="!lastSelectAtShift ?? handleShift('up')"
+                        :class="[selected.includes(i) ? '!bg-calm-green text-primary-content' : '']">
 
-                    <td dir="rtl"
-                        class="whitespace-nowrap overflow-hidden text-ellipsis lg:max-w-[250px] max-w-[150px]">{{ path
-                        }}</td>
+                        <td dir="rtl"
+                            class="whitespace-nowrap overflow-hidden text-ellipsis lg:max-w-[250px] max-w-[150px]">{{
+                            path
+                            }}</td>
 
-                    <td> {{ e. title }} </td>
+                        <td> {{ e. title }} </td>
 
-                    <td>
-                        <span v-for="(a, i) in e.author" :key="a">
-                            {{ i === e.author.length - 1 ? a : a+ ', ' }}
-                        </span>
-                    </td>
+                        <td>
+                            <span v-for="(a, i) in e.author" :key="a">
+                                {{ i === e.author.length - 1 ? a : a+ ', ' }}
+                            </span>
+                        </td>
 
-                    <td>{{ e.year_of_publication }}</td>
+                        <td>{{ e.year_of_publication }}</td>
 
-                    <td>{{ e.publisher }}</td>
+                        <td>{{ e.publisher }}</td>
 
-                    <td v-if="e.genre">
-                        <span v-for="(g, j) in e.genre" :key="g">
-                            {{ j === e.genre.length - 1 ? g : g + ', ' }}
-                        </span>
-                    </td>
-                    <td v-else class="text-centered">
-                        -
-                    </td>
+                        <td v-if="e.genre">
+                            <span v-for="(g, j) in e.genre" :key="g">
+                                {{ j === e.genre.length - 1 ? g : g + ', ' }}
+                            </span>
+                        </td>
+                        <td v-else class="text-centered">
+                            -
+                        </td>
 
-                    <td v-if="e.theme">
-                        <span v-for="(t, j) in e.theme" :key="t">
-                            {{ j === e.theme.length - 1 ? t : t + ', ' }}
-                        </span>
-                    </td>
-                    <td v-else class="text-centered">-</td>
-                </tr>
-            </tbody>
-        </table>
+                        <td v-if="e.theme">
+                            <span v-for="(t, j) in e.theme" :key="t">
+                                {{ j === e.theme.length - 1 ? t : t + ', ' }}
+                            </span>
+                        </td>
+                        <td v-else class="text-centered">-</td>
+                    </tr>
+                </tbody>
+            </table>
+
+
+
+            <!-- Errors -->
+            <details v-if="errorKeys.length" tabindex="0" class="mt-5 collapse bg-base-200 collapse-arrow">
+                <summary class="collapse-title text-xl font-medium text-error">Errors</summary>
+                <div class="collapse-content">
+                    <div v-for="(e, path, i) in errors" :key="i">
+                        <p>{{path}} : {{ e }}</p>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Modal -->
+            <div v-if="open">
+                <EditDraggedMetadata :ebooks="selectedFiles" :keys="keys" @updated="(u) => changeSelectedBooksMetadata(u)" />
+            </div>
+
+        </div>
 
         <!-- Buttons -->
-        <div id="button-row" class="flex justify-center">
-            <button v-if="keys.length" id="add" alt="Add" class="btn btn-primary mr-1" @click="addBook">Add</button>
+        <div v-if="keys.length" id="button-row" class="fixed bottom-0 left-0 w-full flex justify-center p-3 bg-base-200">
+            <button id="add" alt="Add" class="btn btn-primary mr-2" @click="addBook">Add</button>
             <div id="edit-buttons" v-if="selected.length > 0">
-                <button id="edit" class="btn btn-secondary mr-1" @click="loadAndLaunchModal">Edit</button>
-                <button id="delete" class="btn btn-neutral mr-1" @click="deleteBook">Delete</button>
+                <button id="edit" class="btn btn-secondary mr-2" @click="loadAndLaunchModal">Edit</button>
+                <button id="delete" class="btn btn-neutral mr-2" @click="deleteBook">Delete</button>
                 <button id="cancel" class="btn btn-neutral" @click="selected = []">Cancel</button>
             </div>
         </div>
-
-        <!-- Errors -->
-        <details v-if="errorKeys.length" tabindex="0" class="mt-5 collapse bg-base-200 collapse-arrow">
-            <summary class="collapse-title text-xl font-medium text-error">Errors</summary>
-            <div class="collapse-content">
-                <div v-for="(e, path, i) in errors" :key="i">
-                    <p>{{path}} : {{ e }}</p>
-                </div>
-            </div>
-        </details>
-
-        <!-- Modal -->
-        <div v-if="open">
-            <MetadataEdit :ebooks="selectedFiles" :keys="keys" @updated="(u) => changeSelectedBooksMetadata(u)" />
-        </div>
-
     </div>
+
+
 
 
 </template>
@@ -91,7 +98,7 @@
 import { useAddingListStore } from '@/stores/addingList';
 import { computed, onMounted, ref, watch, nextTick } from 'vue';
 import axios from '@/utils/apiRequester'
-import MetadataEdit from './MetadataEdit.vue';
+import EditDraggedMetadata from './EditDraggedMetadata.vue';
 
 const props = defineProps({
     ebooks : {
@@ -114,8 +121,7 @@ const ebooks = computed(() => props.ebooks || store.addingList)
 const open = ref(false)
 
 const errors = ref({})
-const errorKeys = computed(() => Object.keys(errors))
-
+const errorKeys = computed(() => Object.keys(errors.value) || [])
 
 onMounted(async () => {
     // just ensuring store.addingList is fed
