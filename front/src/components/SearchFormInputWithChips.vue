@@ -1,7 +1,7 @@
 <template>
   <div :id="ebookProperty + '-input-with-chip'">
 
-    <input :id="ebookProperty" :ref="ebookProperty + 'ref'" :list="ebookProperty + '-search-result'"
+    <input :id="ebookProperty" :ref="ebookProperty + '-ref'" :list="ebookProperty + '-search-result'"
       @input="(event) => debounce(ebookProperty, event.target.value)" @keydown.enter="addChip()" class="input"
       :name="ebookProperty" type="text" :required="required" minlength="1" maxlength="200"
       :placeholder="computedPlaceholder" />
@@ -38,13 +38,17 @@ const emit = defineEmits(['updated'])
 const timer = ref(null)
 const hasReceivedResponse = ref(false)
 const searchResult = ref([])
-const inputRef = useTemplateRef(ebookProperty + "ref")
+const inputRef = useTemplateRef(ebookProperty + "-ref")
 const chips = ref([])
 
 // still don't know how placeholder isn't already a value when passed, forced to do this for now
 watch(() => placeholder, () => getInitialChip(), {once: true})
 
-onUnmounted(() => searchResult.value = null)
+onUnmounted(() => {
+  searchResult.value = null
+  chips.value = []
+}
+)
 
 function getInitialChip() {
   if (placeholder && placeholder !== "Various") {
@@ -87,7 +91,6 @@ function deleteChip(i) {
 }
 
 async function searchFor(k, v) {
-  console.log(k, v)
   try {
     const res = await axios.get('search', { params : { [k]: v } })
     if (res.status === 200) {
