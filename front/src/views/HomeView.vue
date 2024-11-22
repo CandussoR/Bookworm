@@ -1,5 +1,5 @@
 <template>
-  <main>
+  <main v-if="ebooks">
     <h1 class="text-5xl text-center my-10">Your books</h1>
     <!-- DaisyUI Component -->
     <div class="overflow-x-auto">
@@ -17,8 +17,7 @@
             <th>Theme</th>
           </tr>
         </thead>
-        <TableBody :ebooks="ebooks" 
-          @get-ebooks-for="(key, value) => seeBooksFor(key, value)"
+        <TableBody v-if="ebooks" :ebooks="ebooks" @get-ebooks-for="(key, value) => seeBooksFor(key, value)"
           @update-selection="(data) => handleSelection(data)" />
       </table>
 
@@ -29,6 +28,7 @@
 
     </div>
 
+
     <!-- Buttons -->
     <div v-if="selected.length" id="button-row" class="fixed bottom-0 left-0 w-full flex justify-center p-3 bg-base-200">
       <div id="edit-buttons" v-if="selected.length > 0">
@@ -37,6 +37,10 @@
         <button id="cancel" class="btn btn-neutral" @click="selected = []">Cancel</button>
       </div>
     </div>
+  </main>
+  <main v-else class="h-screen relative">
+    <h1 class="text-5xl text-center my-10">Your books</h1>
+        <span class="absolute bottom-1/2 left-1/2 loading loading-ring loading-lg"></span>
   </main>
 </template>
 
