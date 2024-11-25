@@ -10,9 +10,8 @@ from back.services.authorService import AuthorController
 from back.services.countriesService import CountryController
 from back.services.readingListService import ReadingListController
 from back.services.readingsService import ReadingsController
-from operator import itemgetter
-
 from back.services.searchService import SearchController
+from urllib.parse import unquote
 
 NEW_LINE = "\r\n"
 BODY = b"\r\n\r\n"
@@ -32,7 +31,7 @@ class MyHTTPService():
         return headers
 
     @staticmethod
-    def parse_request(headers : dict) -> str | None :
+    def parse_request(headers : dict) -> str | list | None :
         data = None
 
         if headers["method"] not in ["GET", "DELETE"]:
@@ -48,15 +47,17 @@ class MyHTTPService():
                 data = params.split('=')
             # Cleans query params
             # TODO : remember why this is only in a matrix and not a dict
-            data = [d.replace('+', ' ') for d in data]
+            # Used for search request in forms
+            data = [unquote(d.replace('+', ' ')) for d in data]
 
         # Without query params, 
-        # /api/sth -> two slashes, if we need one more, up until now it's a guid
+        # /api/sth -> two slashes. If we need one more, up until now it's a guid
         if headers["uri"].count('/') > 2: 
-            # TODO : Correct this if we ever use and endpoint with more then 3 slashes
+            # TODO : Correct this if we ever use an endpoint with more then 3 slashes
             data = headers["uri"].rsplit("/", 1).pop()
 
         return data
+
 
 
     @staticmethod
@@ -111,7 +112,10 @@ class RouterService():
             case '/api/reading_lists':
                 return ReadingListController(db, method, data)
             case '/api/dragged':
-                return DraggedController('./dragged.json', method, data)
+                with open('back/env.json') as fr:
+                    env = json.loads(fr.read())
+                    dragged = env["dragged"]
+                return DraggedController(dragged, method, data)
             case '/api/search':
                 return SearchController(db, "GET", data)
             case _:
@@ -159,7 +163,6 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
             # Ignoring type because all the methods have to be implemented
             # in child classes or app should break.
             code, message = service.do() #type: ignore
-            print("code", code, "\nmessage", message)
             http_response = MyHTTPService.create_response_from(code, "application/json", str(message))
             print("sending this response", http_response)
             self.request.sendall(http_response)
