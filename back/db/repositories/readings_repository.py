@@ -4,7 +4,7 @@ class ReadingsRepository():
 
     
     def get_by_guid(self, guid):
-        return self.conn.execute('''SELECT e.title, a.author, beginning_date, ending_date, reading_status, reading_guid 
+        return self.conn.execute('''SELECT e.title, GROUP_CONCAT(a.full_name, ', ') as author, beginning_date, ending_date, s.reading_status, reading_guid 
                           FROM readings r
                           JOIN ebooks e on e.ebook_id = r.ebook_id
                           JOIN reading_status s ON s.reading_status_id = r.reading_status_id
@@ -19,14 +19,23 @@ class ReadingsRepository():
 
 
     def index(self):
-        return self.conn.execute('''SELECT e.title, a.author, beginning_date, ending_date, reading_status, reading_guid 
+        return self.conn.execute('''SELECT e.title, GROUP_CONCAT(a.full_name, ', ') as author, beginning_date, ending_date, s.reading_status, reading_guid 
                           FROM readings r
                           JOIN ebooks e on e.ebook_id = r.ebook_id
                           JOIN reading_status s ON s.reading_status_id = r.reading_status_id
-                          Join ebooks_authors ea ON ea.ebook_id = r.ebook_id
+                          JOIN ebooks_authors ea ON ea.ebook_id = r.ebook_id
                           JOIN authors a ON a.author_id = ea.author_id;''').fetchall()
     
 
+    def active_readings(self):
+        return self.conn.execute('''SELECT e.title, GROUP_CONCAT(a.full_name, ', ') as author, beginning_date, ending_date, s.reading_status, reading_guid 
+                          FROM readings r
+                          JOIN ebooks e on e.ebook_id = r.ebook_id
+                          JOIN reading_status s ON s.reading_status_id = r.reading_status_id
+                          JOIN ebooks_authors ea ON ea.ebook_id = r.ebook_id
+                          JOIN authors a ON a.author_id = ea.author_id
+                          WHERE r.reading_status_id = 1;''').fetchall()
+    
 
     def create(self, model):
         guid, = self.conn.execute('''INSERT INTO readings (ebook_id, beginning_date, ending_date, reading_status_id, reading_guid)

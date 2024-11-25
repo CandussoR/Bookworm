@@ -43,7 +43,8 @@ class ReadingModel():
 @dataclass
 class ReadingRessource():
     title : str
-    beginning_date : date
+    author : str
+    beginning_date : date 
     ending_date : date | None
     reading_status : str
     reading_guid : str
@@ -71,11 +72,14 @@ class ReadingsController(LibraryController):
         self.conn = conn
         self.method = method
         self.data = data
+        self.repo = ReadingsRepository(self.conn)
 
     
     def do_GET(self):
         if not self.data:
-            return ReadingsRepository(self.conn).index()
+            return 200, [ReadingRessource(*r) for r in self.repo.index()]
+        if 'activate' in self.data:
+            return 200, [ReadingRessource(*r) for r in self.repo.active_readings()]
         else :
             return 401, "Not Implemented either"
         
