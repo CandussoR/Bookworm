@@ -23,14 +23,17 @@
 
       <!-- Modal -->
       <div v-if="open">
-      <EditDatabaseData :ebooks="selectedBooks" :keys="keys" @updated="(u) => updateBooks(u)" />
+        <EditDatabaseData :ebooks="selectedBooks" :keys="keys" @updated="(u) => updateBooks(u)" />
       </div>
+      <!-- Pagination -->
+      <Pagination class="align-right" :number-of-pages=numberOfPages @get-page="(num) => getPage(num)" />
 
     </div>
 
 
     <!-- Buttons -->
-    <div v-if="selected.length" id="button-row" class="fixed bottom-0 left-0 w-full flex justify-center p-3 bg-base-200">
+    <div v-if="selected.length" id="button-row"
+      class="fixed bottom-0 left-0 w-full flex justify-center p-3 bg-base-200">
       <div id="edit-buttons" v-if="selected.length > 0">
         <button id="edit" class="btn btn-secondary mr-2" @click="loadAndLaunchModal">Edit</button>
         <button id="delete" class="btn btn-neutral mr-2" @click="deleteBook">Delete</button>
@@ -40,7 +43,7 @@
   </main>
   <main v-else class="h-screen relative">
     <h1 class="text-5xl text-center my-10">Your books</h1>
-        <span class="absolute bottom-1/2 left-1/2 loading loading-ring loading-lg"></span>
+    <span class="absolute bottom-1/2 left-1/2 loading loading-ring loading-lg"></span>
   </main>
 </template>
 
@@ -50,21 +53,24 @@ import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import TableBody from '@/components/TableBody.vue'
 import EditDatabaseData from '@/components/EditDatabaseData.vue'
+import Pagination from '@/components/Pagination.vue'
 import { ebookStore } from '@/stores/ebooks.js'
 import axios from '@/utils/apiRequester'
 
+let router = useRouter()
 const store = ebookStore()
 let ebooks = ref(null)
-let router = useRouter()
 let selected = ref([])
 let selectedBooks = computed(() => selected.value.map((i) => ebooks.value[i]))
 const open = ref(false)
+const numberOfPages = ref(null)
 
 onMounted(async () => {
   if (!store.ebooks) {
     await store.index()
   }
-  ebooks.value = store.ebooks
+  numberOfPages.value = calculateNumberOfPages()
+  getPage(1)
 })
 
 function seeBooksFor(key, value) {
@@ -78,11 +84,11 @@ function handleSelection(data) {
 
 // Opens the modal for potential edit
 function loadAndLaunchModal() {
-    open.value = true
-    nextTick(() => {
-        const modal = document.getElementById('edit_modal')
-        modal.showModal()
-    })
+  open.value = true
+  nextTick(() => {
+    const modal = document.getElementById('edit_modal')
+    modal.showModal()
+  })
 }
 
 
@@ -114,6 +120,15 @@ async function deleteBook() {
   catch (error) {
     console.error(error)
   }
+}
 
+function calculateNumberOfPages() {
+  return store.ebooks.length / import.meta.env.VITE_PAGE
+}
+
+
+function getPage(num) {
+  const beginning = (num - 1) * import.meta.env.VITE_PAGE
+  ebooks.value = store.ebooks.slice(beginning, beginning + import.meta.env.VITE_PAGE)
 }
 </script>
