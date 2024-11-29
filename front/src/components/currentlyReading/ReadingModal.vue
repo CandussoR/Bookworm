@@ -4,7 +4,7 @@
         <h3 class="text-lg font-bold text-center">{{ record ? 'Update a reading' : 'Add a reading' }}</h3>
 
         <div class="modal-action place-content-center">
-          <form @submit="submitForm" method="dialog">
+          <form @submit.prevent="submitForm">
             <div class="flex flex-col gap-y-5">
               <!-- Search -->
               <CustomDatalist v-if="!selected" @selected="(b) => selected = b" />
@@ -46,8 +46,13 @@
                 </select>
               </div>
             </div>
+
+            <div v-if="error" id="error">
+              <p  class="text-error">{{error}}</p>
+            </div>
+
             <!-- if there is a button in form, it will close the modal -->
-            <button class="btn" type="submit" :disabled="isDisabled">
+            <button class="btn" type="submit" :disabled="isFormValid() && isValidDates(dateBeginning, dateEnding) ? false : true">
               Submit
             </button>
           </form>
@@ -57,7 +62,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch, computed } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import CustomDatalist from './CustomDatalist.vue';
 
 const emit = defineEmits(['submit'])
@@ -75,7 +80,6 @@ const dateBeginning = ref(null)
 const dateEnding = ref(null)
 const readingStatus = ref(1)
 const error = ref(null)
-const isDisabled = computed(() => isFormValid())
 
 onMounted(() => {
   if (!record) return;
@@ -98,47 +102,43 @@ function getReadingStatusValue(val) {
 
 
 function submitForm() {
-  //   if (!(isValidDates(dateBeginning.value, dateEnding.value))) {
-  //   console.error("Wrong dates.")
-  //   return
-  // }
-  //   if (readingStatus.value !== 1 && !dateEnding.value) {
-  //     console.error("missing date for the status")
-  //   }
   if (!isFormValid()) return;
 
   const data = {
     [record? "reading_guid" : "ebook_guid"]: record? record.reading_guid : selected.value.ebook_guid,
     "beginning_date": dateBeginning.value,
     "ending_date": dateEnding.value,
-    "reading_status": readingStatus.value,
+    "reading_status": Number(readingStatus.value),
   }
 
     emit('submit', record ? 'update' : 'create', data)
 }
 
 function isFormValid() {
-  if (readingStatus !== 1 && !dateEnding.value) {
-    error.value = "This record must have an ending value."
-    return true;
-  }
-  if (!isValidDates(dateBeginning.value, dateEnding.value)) {
-    error.value = "Error in dates."
-    return true
-  }
-  return false
-}
-
-
-function isValidDates(startingDate, endingDate) {
-  if (startingDate === null || (startingDate && endingDate && endingDate < startingDate)) {
+  // When the component is initialized, probably no date values but no error, so we just get out
+  if (!dateBeginning.value && !dateEnding.value) {
     return false
   }
 
+  if (readingStatus.value !== 1 && !dateEnding.value) {
+    error.value = "This record must have an ending value."
+    return false;
+  }
+  if (!isValidDates(dateBeginning.value, dateEnding.value)) {
+    error.value = "Error in dates."
+    return false
+  }
+  return true
+}
 
+
+function isValidDates(start, end) {
+  if (start === null || (start && end && end < start)) {
+    return false
+  }
   
   const currentDate = getCurrentDate();
-  if (endingDate && endingDate > currentDate) {
+  if (end && end > currentDate) {
     return false
   }
 

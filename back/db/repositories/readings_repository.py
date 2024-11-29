@@ -4,13 +4,14 @@ class ReadingsRepository():
 
     
     def get_by_guid(self, guid):
-        return self.conn.execute('''SELECT e.title, GROUP_CONCAT(a.full_name, ', ') as author, beginning_date, ending_date, s.reading_status, reading_guid 
+        return self.conn.execute(f'''SELECT e.title, GROUP_CONCAT(a.full_name, ', ') as author, beginning_date, ending_date, s.reading_status, reading_guid 
                           FROM readings r
                           JOIN ebooks e on e.ebook_id = r.ebook_id
                           JOIN reading_status s ON s.reading_status_id = r.reading_status_id
                           Join ebooks_authors ea ON ea.ebook_id = r.ebook_id
                           JOIN authors a ON a.author_id = ea.author_id
-                          WHERE reading_guid = ?;''', [guid]).fetchone()
+                          WHERE reading_guid = ?
+                          GROUP BY e.title;''', [guid]).fetchone()
     
     
     def is_ebook_read(self, ebook_id) :
@@ -24,7 +25,8 @@ class ReadingsRepository():
                           JOIN ebooks e on e.ebook_id = r.ebook_id
                           JOIN reading_status s ON s.reading_status_id = r.reading_status_id
                           JOIN ebooks_authors ea ON ea.ebook_id = r.ebook_id
-                          JOIN authors a ON a.author_id = ea.author_id;''').fetchall()
+                          JOIN authors a ON a.author_id = ea.author_id
+                          GROUP BY e.title;''').fetchall()
     
 
     def active_readings(self):
@@ -34,7 +36,8 @@ class ReadingsRepository():
                           JOIN reading_status s ON s.reading_status_id = r.reading_status_id
                           JOIN ebooks_authors ea ON ea.ebook_id = r.ebook_id
                           JOIN authors a ON a.author_id = ea.author_id
-                          WHERE r.reading_status_id = 1;''').fetchall()
+                          WHERE r.reading_status_id = 1
+                          GROUP BY e.title;''').fetchall()
     
 
     def create(self, model):
